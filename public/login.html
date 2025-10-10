@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParkingPro - Login</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <div class="logo-icon">🚗</div>
+                <span>ParkingPro</span>
+            </div>
+            
+            <h2>Iniciar Sesión</h2>
+            <p class="login-subtitle">Sistema de Gestión de Parqueo</p>
+            
+            <div id="alertMessage" class="hidden"></div>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        class="form-input" 
+                        placeholder="usuario@parqueo.com"
+                        required
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        class="form-input" 
+                        placeholder="Tu contraseña"
+                        required
+                    >
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+                    <span>🔑 Ingresar al Sistema</span>
+                </button>
+            </form>
+            
+            <div class="login-info">
+                <h4>Usuarios de Prueba:</h4>
+                <div class="user-list">
+                    <div class="user-item">
+                        <strong>Admin:</strong> admin@parqueo.com / admin123
+                    </div>
+                    <div class="user-item">
+                        <strong>Empleado:</strong> juan@parqueo.com / juan123
+                    </div>
+                    <div class="user-item">
+                        <strong>Empleado:</strong> maria@parqueo.com / maria123
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const button = e.target.querySelector('button');
+            const originalText = button.innerHTML;
+            
+            button.innerHTML = '⏳ Verificando...';
+            button.disabled = true;
+            
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    window.location.href = '/dashboard';
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                mostrarAlerta('❌ ' + error.message, 'error');
+            } finally {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        });
+        
+        function mostrarAlerta(mensaje, tipo = 'error') {
+            const container = document.getElementById('alertMessage');
+            container.className = `alert alert-${tipo}`;
+            container.innerHTML = mensaje;
+            container.classList.remove('hidden');
+        }
+        
+        // Si ya está logueado, redirigir al dashboard
+        if (localStorage.getItem('token')) {
+            window.location.href = '/dashboard';
+        }
+    </script>
+</body>
+</html>

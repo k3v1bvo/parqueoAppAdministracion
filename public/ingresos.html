@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingresos Extra - ParkingPro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="logo">
+                <div class="logo-icon">💰</div>
+                <span>ParkingPro - Ingresos Extra</span>
+            </div>
+            <div class="nav-user">
+                <span id="userName">Cargando...</span>
+                <div>
+                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/dashboard'">📊 Dashboard</button>
+                    <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard">
+            <!-- Formulario de Ingreso Extra -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Registrar Ingreso Extra</h2>
+                </div>
+                
+                <div id="alertMessage" class="hidden"></div>
+                
+                <form id="ingresoForm">
+                    <div class="form-group">
+                        <label class="form-label" for="concepto">Concepto *</label>
+                        <input 
+                            type="text" 
+                            id="concepto" 
+                            class="form-input" 
+                            placeholder="Ej: Lavado de auto, Venta de agua, etc."
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="monto">Monto (Bs) *</label>
+                        <input 
+                            type="number" 
+                            id="monto" 
+                            class="form-input" 
+                            placeholder="0.00"
+                            step="0.01"
+                            min="0"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="descripcion">Descripción Detallada *</label>
+                        <textarea 
+                            id="descripcion" 
+                            class="form-input" 
+                            placeholder="Describe detalladamente el origen de este ingreso..."
+                            rows="3"
+                            required
+                        ></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success" style="width: 100%;">
+                        <span>💰 Registrar Ingreso</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Lista de Ingresos Recientes -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Ingresos Extra Registrados Hoy</h2>
+                    <button class="btn btn-secondary btn-sm" onclick="cargarIngresos()">
+                        🔄 Actualizar
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Concepto</th>
+                                <th>Descripción</th>
+                                <th>Monto</th>
+                                <th>Registrado por</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaIngresos">
+                            <tr>
+                                <td colspan="5" class="text-center">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="resumen-total">
+                        <strong>Total Hoy: </strong>
+                        <span id="totalHoy" class="badge badge-success">0.00 Bs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script>
+        async function registrarIngreso(event) {
+            event.preventDefault();
+            
+            const concepto = document.getElementById('concepto').value.trim();
+            const monto = parseFloat(document.getElementById('monto').value);
+            const descripcion = document.getElementById('descripcion').value.trim();
+
+            if (!concepto || isNaN(monto) || monto <= 0 || !descripcion) {
+                mostrarAlerta('❌ Todos los campos son requeridos', 'error');
+                return;
+            }
+
+            const button = event.target.querySelector('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Registrando...';
+            button.disabled = true;
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/ingresos', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        concepto,
+                        monto,
+                        descripcion
+                    })
+                });
+
+                const data = await res.json();
+                
+                if (data.success) {
+                    mostrarAlerta('✅ Ingreso extra registrado correctamente');
+                    document.getElementById('ingresoForm').reset();
+                    cargarIngresos();
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                mostrarAlerta('❌ Error: ' + error.message, 'error');
+            } finally {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        async function cargarIngresos() {
+            try {
+                const token = localStorage.getItem('token');
+                const hoy = new Date().toISOString().split('T')[0];
+                const res = await fetch(`/api/ingresos?fecha=${hoy}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!res.ok) throw new Error('Error al cargar ingresos');
+                
+                const ingresos = await res.json();
+                const tabla = document.getElementById('tablaIngresos');
+                const totalHoy = document.getElementById('totalHoy');
+                
+                // Calcular total
+                const total = ingresos.reduce((sum, ingreso) => sum + ingreso.costo_total, 0);
+                totalHoy.textContent = total.toFixed(2) + ' Bs';
+                
+                if (ingresos.length === 0) {
+                    tabla.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                No hay ingresos extra registrados hoy
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tabla.innerHTML = ingresos.map(ingreso => `
+                    <tr>
+                        <td><strong>${ingreso.descripcion?.split(' - ')[0]?.replace('INGRESO EXTRA: ', '') || 'Ingreso extra'}</strong></td>
+                        <td>${ingreso.descripcion?.split(' - ')[1] || 'Sin descripción adicional'}</td>
+                        <td><strong class="text-success">${ingreso.costo_total.toFixed(2)} Bs</strong></td>
+                        <td>${ingreso.usuarios?.nombre || 'N/A'}</td>
+                        <td>${new Date(ingreso.hora_entrada).toLocaleTimeString()}</td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                const tabla = document.getElementById('tablaIngresos');
+                if (tabla) {
+                    tabla.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                ❌ Error al cargar ingresos
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
+        }
+
+        function mostrarAlerta(mensaje, tipo = 'success') {
+            const container = document.getElementById('alertMessage');
+            container.className = `alert alert-${tipo}`;
+            container.textContent = mensaje;
+            container.classList.remove('hidden');
+            
+            setTimeout(() => {
+                container.classList.add('hidden');
+            }, 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = `${user.nombre} (${user.rol})`;
+            
+            const ingresoForm = document.getElementById('ingresoForm');
+            if (ingresoForm) {
+                ingresoForm.addEventListener('submit', registrarIngreso);
+            }
+            
+            cargarIngresos();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gastos - ParkingPro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="logo">
+                <div class="logo-icon">💸</div>
+                <span>ParkingPro - Control de Gastos</span>
+            </div>
+            <div class="nav-user">
+                <span id="userName">Cargando...</span>
+                <div>
+                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/dashboard'">📊 Dashboard</button>
+                    <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard">
+            <!-- Formulario de Gastos -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Registrar Gasto</h2>
+                </div>
+                
+                <div id="alertMessage" class="hidden"></div>
+                
+                <form id="gastoForm">
+                    <div class="form-group">
+                        <label class="form-label" for="categoria">Categoría *</label>
+                        <select id="categoria" class="form-select" required>
+                            <option value="">Seleccionar categoría...</option>
+                            <option value="mantenimiento">Mantenimiento</option>
+                            <option value="servicios">Servicios</option>
+                            <option value="nomina">Nómina</option>
+                            <option value="insumos">Insumos</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="concepto">Concepto *</label>
+                        <input 
+                            type="text" 
+                            id="concepto" 
+                            class="form-input" 
+                            placeholder="Ej: Compra de herramientas, Pago de luz, etc."
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="monto">Monto (Bs) *</label>
+                        <input 
+                            type="number" 
+                            id="monto" 
+                            class="form-input" 
+                            placeholder="0.00"
+                            step="0.01"
+                            min="0"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="descripcion">Descripción Detallada *</label>
+                        <textarea 
+                            id="descripcion" 
+                            class="form-input" 
+                            placeholder="Describe detalladamente en qué se utilizó este gasto..."
+                            rows="3"
+                            required
+                        ></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-danger" style="width: 100%;">
+                        <span>💸 Registrar Gasto</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Lista de Gastos -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Gastos Registrados Hoy</h2>
+                    <div>
+                        <button class="btn btn-secondary btn-sm" onclick="cargarGastos()">
+                            🔄 Actualizar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filtros -->
+                <div class="filtros">
+                    <select id="filtroCategoria" class="form-select" onchange="cargarGastos()">
+                        <option value="">Todas las categorías</option>
+                        <option value="mantenimiento">Mantenimiento</option>
+                        <option value="servicios">Servicios</option>
+                        <option value="nomina">Nómina</option>
+                        <option value="insumos">Insumos</option>
+                        <option value="otros">Otros</option>
+                    </select>
+                </div>
+                
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Categoría</th>
+                                <th>Concepto</th>
+                                <th>Descripción</th>
+                                <th>Monto</th>
+                                <th>Registrado por</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaGastos">
+                            <tr>
+                                <td colspan="6" class="text-center">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="resumen-total">
+                        <strong>Total Gastos Hoy: </strong>
+                        <span id="totalGastos" class="badge badge-danger">0.00 Bs</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumen por Categoría -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Resumen de Gastos por Categoría</h2>
+                </div>
+                <div id="resumenCategorias">
+                    <div class="text-center">Cargando resumen...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script>
+        async function registrarGasto(event) {
+            event.preventDefault();
+            
+            const categoria = document.getElementById('categoria').value;
+            const concepto = document.getElementById('concepto').value.trim();
+            const monto = parseFloat(document.getElementById('monto').value);
+            const descripcion = document.getElementById('descripcion').value.trim();
+
+            if (!categoria || !concepto || isNaN(monto) || monto <= 0 || !descripcion) {
+                mostrarAlerta('❌ Todos los campos son requeridos', 'error');
+                return;
+            }
+
+            const button = event.target.querySelector('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Registrando...';
+            button.disabled = true;
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/gastos', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        categoria,
+                        concepto,
+                        monto,
+                        descripcion
+                    })
+                });
+
+                const data = await res.json();
+                
+                if (data.success) {
+                    mostrarAlerta('✅ Gasto registrado correctamente');
+                    document.getElementById('gastoForm').reset();
+                    cargarGastos();
+                    cargarResumenCategorias();
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                mostrarAlerta('❌ Error: ' + error.message, 'error');
+            } finally {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        async function cargarGastos() {
+            try {
+                const token = localStorage.getItem('token');
+                const categoria = document.getElementById('filtroCategoria').value;
+                const hoy = new Date().toISOString().split('T')[0];
+                
+                let url = `/api/gastos?fecha=${hoy}`;
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!res.ok) throw new Error('Error al cargar gastos');
+                
+                let gastos = await res.json();
+                
+                // Filtrar por categoría si está seleccionada
+                if (categoria) {
+                    gastos = gastos.filter(gasto => gasto.categoria === categoria);
+                }
+                
+                const tabla = document.getElementById('tablaGastos');
+                const totalGastos = document.getElementById('totalGastos');
+                
+                // Calcular total
+                const total = gastos.reduce((sum, gasto) => sum + Math.abs(gasto.costo_total), 0);
+                totalGastos.textContent = total.toFixed(2) + ' Bs';
+                
+                if (gastos.length === 0) {
+                    tabla.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                No hay gastos registrados hoy
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tabla.innerHTML = gastos.map(gasto => `
+                    <tr>
+                        <td>
+                            <span class="badge ${getBadgeClass(gasto.categoria)}">
+                                ${getCategoriaName(gasto.categoria)}
+                            </span>
+                        </td>
+                        <td><strong>${gasto.descripcion?.split(' - ')[0]?.replace('GASTO [', '').replace(']: ', ' - ') || 'Gasto'}</strong></td>
+                        <td>${gasto.descripcion?.split(' - ')[1] || 'Sin descripción adicional'}</td>
+                        <td><strong class="text-danger">${Math.abs(gasto.costo_total).toFixed(2)} Bs</strong></td>
+                        <td>${gasto.usuarios?.nombre || 'N/A'}</td>
+                        <td>${new Date(gasto.hora_entrada).toLocaleTimeString()}</td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                const tabla = document.getElementById('tablaGastos');
+                if (tabla) {
+                    tabla.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                ❌ Error al cargar gastos
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
+        }
+
+        async function cargarResumenCategorias() {
+            try {
+                const token = localStorage.getItem('token');
+                const hoy = new Date().toISOString().split('T')[0];
+                const res = await fetch(`/api/gastos?fecha=${hoy}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!res.ok) throw new Error('Error al cargar resumen');
+                
+                const gastos = await res.json();
+                
+                const resumen = gastos.reduce((acc, gasto) => {
+                    const categoria = gasto.categoria || 'otros';
+                    acc[categoria] = (acc[categoria] || 0) + Math.abs(gasto.costo_total);
+                    return acc;
+                }, {});
+                
+                const container = document.getElementById('resumenCategorias');
+                
+                if (Object.keys(resumen).length === 0) {
+                    container.innerHTML = '<div class="text-center">No hay gastos hoy</div>';
+                    return;
+                }
+                
+                const totalGeneral = Object.values(resumen).reduce((sum, val) => sum + val, 0);
+                
+                container.innerHTML = Object.entries(resumen).map(([categoria, total]) => `
+                    <div class="categoria-item">
+                        <div class="categoria-info">
+                            <span class="badge ${getBadgeClass(categoria)}">
+                                ${getCategoriaName(categoria)}
+                            </span>
+                            <span class="categoria-total">${total.toFixed(2)} Bs</span>
+                            <span class="categoria-porcentaje">${((total / totalGeneral) * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="categoria-bar">
+                            <div 
+                                class="categoria-progress" 
+                                style="width: ${(total / totalGeneral) * 100}%"
+                            ></div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Error cargando resumen:', error);
+            }
+        }
+
+        function getCategoriaName(categoria) {
+            const nombres = {
+                'mantenimiento': 'Mantenimiento',
+                'servicios': 'Servicios',
+                'nomina': 'Nómina',
+                'insumos': 'Insumos',
+                'otros': 'Otros'
+            };
+            return nombres[categoria] || categoria;
+        }
+
+        function getBadgeClass(categoria) {
+            const clases = {
+                'mantenimiento': 'badge-warning',
+                'servicios': 'badge-primary',
+                'nomina': 'badge-success',
+                'insumos': 'badge-secondary',
+                'otros': 'badge-danger'
+            };
+            return clases[categoria] || 'badge-secondary';
+        }
+
+        function mostrarAlerta(mensaje, tipo = 'success') {
+            const container = document.getElementById('alertMessage');
+            container.className = `alert alert-${tipo}`;
+            container.textContent = mensaje;
+            container.classList.remove('hidden');
+            
+            setTimeout(() => {
+                container.classList.add('hidden');
+            }, 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = `${user.nombre} (${user.rol})`;
+            
+            const gastoForm = document.getElementById('gastoForm');
+            if (gastoForm) {
+                gastoForm.addEventListener('submit', registrarGasto);
+            }
+            
+            cargarGastos();
+            cargarResumenCategorias();
+        });
+    </script>
+</body>
+</html>

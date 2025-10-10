@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - ParkingPro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="logo">
+                <div class="logo-icon">🚗</div>
+                <span>ParkingPro</span>
+            </div>
+            <div class="nav-user">
+                <span id="userName">Cargando...</span>
+                <div>
+                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/dashboard'">📊 Dashboard</button>
+                    <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="dashboard">
+            <!-- Tarjeta de Registro -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Registro de Vehículos</h2>
+                    <span class="badge badge-success" id="contadorActivos">0 activos</span>
+                </div>
+                
+                <div id="alertMessage" class="hidden"></div>
+                
+                <form id="registroForm">
+                    <div class="form-group">
+                        <label class="form-label" for="placa">Placa del Vehículo</label>
+                        <input 
+                            type="text" 
+                            id="placa" 
+                            class="form-input" 
+                            placeholder="Ej: ABC123"
+                            maxlength="10"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="tipo">Tipo de Vehículo</label>
+                        <select id="tipo" class="form-select" required>
+                            <option value="">Seleccionar tipo...</option>
+                            <option value="auto">Auto</option>
+                            <option value="moto">Moto</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <span>🚀 Registrar Ingreso</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Vehículos Activos -->
+            <div class="card fade-in">
+                <div class="card-header">
+                    <h2 class="card-title">Vehículos en Parqueo</h2>
+                    <button class="btn btn-secondary btn-sm" onclick="cargarVehiculosActivos()">
+                        🔄 Actualizar
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Placa</th>
+                                <th>Tipo</th>
+                                <th>Hora Entrada</th>
+                                <th>Tiempo</th>
+                                <th>Operador</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaActivos">
+                            <tr>
+                                <td colspan="6" class="text-center">Cargando...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script>
+        async function registrarVehiculo(event) {
+            event.preventDefault();
+            
+            const placa = document.getElementById('placa').value.trim();
+            const tipo = document.getElementById('tipo').value;
+            
+            if (!placa || !tipo) {
+                mostrarAlerta('❌ Por favor complete todos los campos', 'error');
+                return;
+            }
+
+            const button = event.target.querySelector('button');
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Registrando...';
+            button.disabled = true;
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/tickets', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ placa, tipo_vehiculo: tipo })
+                });
+
+                const data = await res.json();
+                
+                if (data.success) {
+                    mostrarAlerta('✅ Vehículo registrado correctamente');
+                    document.getElementById('registroForm').reset();
+                    cargarVehiculosActivos();
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                mostrarAlerta('❌ Error: ' + error.message, 'error');
+            } finally {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        }
+
+        async function cargarVehiculosActivos() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/tickets/activos', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (!res.ok) throw new Error('Error al cargar vehículos');
+                
+                const vehiculos = await res.json();
+                
+                const tabla = document.getElementById('tablaActivos');
+                const contador = document.getElementById('contadorActivos');
+                
+                contador.textContent = `${vehiculos.length} activos`;
+                
+                if (vehiculos.length === 0) {
+                    tabla.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                🅿️ No hay vehículos en el parqueo
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tabla.innerHTML = vehiculos.map(vehiculo => `
+                    <tr>
+                        <td><strong>${vehiculo.placa_vehiculo}</strong></td>
+                        <td>
+                            <span class="badge ${vehiculo.tipo_vehiculo === 'auto' ? 'badge-success' : 'badge-warning'}">
+                                ${vehiculo.tipo_vehiculo}
+                            </span>
+                        </td>
+                        <td>${formatearFecha(vehiculo.hora_entrada)}</td>
+                        <td>${calcularTiempoTranscurrido(vehiculo.hora_entrada)}</td>
+                        <td>${vehiculo.usuarios?.nombre || 'N/A'}</td>
+                        <td>
+                            <button 
+                                class="btn btn-danger btn-sm" 
+                                onclick="marcarSalida('${vehiculo.id}')"
+                            >
+                                🚗 Salida
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                
+            } catch (error) {
+                const tabla = document.getElementById('tablaActivos');
+                if (tabla) {
+                    tabla.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                ❌ Error al cargar vehículos
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
+        }
+
+        async function marcarSalida(id) {
+            if (!confirm('¿Está seguro de marcar la salida de este vehículo?')) {
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`/api/tickets/salida/${id}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await res.json();
+                
+                if (data.success) {
+                    mostrarAlerta('✅ Salida registrada correctamente');
+                    cargarVehiculosActivos();
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                mostrarAlerta('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        function formatearFecha(fechaISO) {
+            const fecha = new Date(fechaISO);
+            return fecha.toLocaleTimeString('es-ES', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+
+        function calcularTiempoTranscurrido(entradaISO) {
+            const entrada = new Date(entradaISO);
+            const ahora = new Date();
+            const diffMs = ahora - entrada;
+            
+            const horas = Math.floor(diffMs / (1000 * 60 * 60));
+            const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            
+            return `${horas}h ${minutos}m`;
+        }
+
+        function mostrarAlerta(mensaje, tipo = 'success') {
+            const container = document.getElementById('alertMessage');
+            container.className = `alert alert-${tipo}`;
+            container.textContent = mensaje;
+            container.classList.remove('hidden');
+            
+            setTimeout(() => {
+                container.classList.add('hidden');
+            }, 5000);
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = `${user.nombre} (${user.rol})`;
+            
+            const registroForm = document.getElementById('registroForm');
+            if (registroForm) {
+                registroForm.addEventListener('submit', registrarVehiculo);
+            }
+            
+            // Formatear placa en tiempo real
+            const placaInput = document.getElementById('placa');
+            if (placaInput) {
+                placaInput.addEventListener('input', function(e) {
+                    e.target.value = e.target.value.toUpperCase();
+                });
+            }
+            
+            cargarVehiculosActivos();
+            setInterval(cargarVehiculosActivos, 30000);
+        });
+    </script>
+</body>
+</html>
