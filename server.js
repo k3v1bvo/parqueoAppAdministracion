@@ -6,36 +6,51 @@ import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// Configuración de paths
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configuración de entorno
 dotenv.config();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Crear aplicación Express
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
-// Supabase Client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+// Configuración de Supabase
+console.log("🔄 Iniciando servidor...");
 
-const JWT_SECRET = process.env.JWT_SECRET || 'parqueo_super_secret_key_2024';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("❌ ERROR: Faltan variables de entorno");
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+const JWT_SECRET = process.env.JWT_SECRET || 'parqueo_secret_2024';
+
+console.log("✅ Supabase configurado correctamente");
 
 // ==============================
 // MIDDLEWARE DE AUTENTICACIÓN
 // ==============================
 
 const authenticateToken = async (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Token de acceso requerido' });
-  }
-
   try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'Token de acceso requerido' });
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET);
     
     const { data: session, error } = await supabase
@@ -56,18 +71,13 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-const requireAdmin = (req, res, next) => {
-  if (req.user.rol !== 'admin') {
-    return res.status(403).json({ error: 'Se requieren permisos de administrador' });
-  }
-  next();
-};
-
 // ==============================
-// RUTAS DE AUTENTICACIÓN
+// RUTAS DE AUTENTICACIÓN MEJORADAS
 // ==============================
 
 app.post("/api/auth/login", async (req, res) => {
+  console.log("🔐 SOLICITUD LOGIN:", { email: req.body.email, password: '***' });
+  
   try {
     const { email, password } = req.body;
 
@@ -75,21 +85,45 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(400).json({ error: "Email y contraseña son requeridos" });
     }
 
+    // Buscar usuario
     const { data: usuario, error } = await supabase
       .from("usuarios")
       .select("*")
-      .eq("email", email.toLowerCase())
+      .eq("email", email.toLowerCase().trim())
       .single();
 
     if (error || !usuario) {
+      console.log("❌ USUARIO NO ENCONTRADO:", email);
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
+    console.log("✅ USUARIO ENCONTRADO:", usuario.email);
+    
+    // Verificar si el hash es válido
+    const isValidBcryptHash = usuario.password && 
+      (usuario.password.startsWith('$2a$') || 
+       usuario.password.startsWith('$2b$') || 
+       usuario.password.startsWith('$2y$'));
+    
+    console.log("🔍 ESTRUCTURA HASH VÁLIDA:", isValidBcryptHash);
+    
+    if (!isValidBcryptHash) {
+      console.log("❌ HASH INVALIDO EN BD");
+      return res.status(500).json({ error: "Error en configuración de contraseñas" });
+    }
+
+    // Verificar contraseña
     const passwordValid = await bcrypt.compare(password, usuario.password);
+    console.log("🔍 RESULTADO COMPARACIÓN:", passwordValid);
+    
     if (!passwordValid) {
+      console.log("❌ CONTRASEÑA INCORRECTA");
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
+    console.log("✅ CONTRASEÑA VÁLIDA");
+
+    // Crear token JWT
     const token = jwt.sign(
       { 
         userId: usuario.id, 
@@ -100,9 +134,11 @@ app.post("/api/auth/login", async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    // Calcular expiración
     const expiraEn = new Date();
     expiraEn.setHours(expiraEn.getHours() + 24);
 
+    // Guardar sesión
     const { error: sessionError } = await supabase
       .from("sesiones")
       .insert([{
@@ -111,7 +147,12 @@ app.post("/api/auth/login", async (req, res) => {
         expira_en: expiraEn.toISOString()
       }]);
 
-    if (sessionError) throw sessionError;
+    if (sessionError) {
+      console.log("❌ ERROR SESIÓN:", sessionError.message);
+      return res.status(500).json({ error: "Error interno del servidor" });
+    }
+
+    console.log("🎉 LOGIN EXITOSO:", usuario.nombre);
 
     res.json({
       success: true,
@@ -125,8 +166,14 @@ app.post("/api/auth/login", async (req, res) => {
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.log("💥 ERROR GENERAL:", error.message);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
+});
+
+// RUTAS QUE USAN authenticateToken
+app.get("/api/auth/me", authenticateToken, (req, res) => {
+  res.json({ user: req.user });
 });
 
 app.post("/api/auth/logout", authenticateToken, async (req, res) => {
@@ -144,13 +191,24 @@ app.post("/api/auth/logout", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/auth/me", authenticateToken, (req, res) => {
-  res.json({ user: req.user });
-});
+// ==============================
+// RUTAS DE TICKETS (MANTENIDAS)
+// ==============================
 
-// ==============================
-// RUTAS DE TICKETS (Vehículos)
-// ==============================
+app.get("/api/tickets/activos", authenticateToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("tickets")
+      .select("*, usuarios!operador_id(nombre, email)")
+      .is("hora_salida", null)
+      .order("hora_entrada", { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 app.post("/api/tickets", authenticateToken, async (req, res) => {
   try {
@@ -169,31 +227,10 @@ app.post("/api/tickets", authenticateToken, async (req, res) => {
         operador_id: req.user.id,
         estado: 'activo'
       }])
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `);
+      .select("*, usuarios!operador_id(nombre, email)");
 
     if (error) throw error;
     res.json({ success: true, data });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get("/api/tickets/activos", authenticateToken, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("tickets")
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `)
-      .is("hora_salida", null)
-      .order("hora_entrada", { ascending: false });
-
-    if (error) throw error;
-    res.json(data);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -209,10 +246,7 @@ app.put("/api/tickets/salida/:id", authenticateToken, async (req, res) => {
         estado: 'finalizado'
       })
       .eq("id", id)
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `);
+      .select("*, usuarios!operador_id(nombre, email)");
 
     if (error) throw error;
     res.json({ success: true, data });
@@ -246,10 +280,7 @@ app.post("/api/ingresos", authenticateToken, async (req, res) => {
         operador_id: req.user.id,
         descripcion: `INGRESO EXTRA: ${concepto} - ${descripcion || 'Sin descripción adicional'}`
       }])
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `);
+      .select("*, usuarios!operador_id(nombre, email)");
 
     if (error) throw error;
     res.json({ success: true, data });
@@ -263,10 +294,7 @@ app.get("/api/ingresos", authenticateToken, async (req, res) => {
     const { fecha } = req.query;
     let query = supabase
       .from("tickets")
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `)
+      .select("*, usuarios!operador_id(nombre, email)")
       .eq("tipo_vehiculo", "ingreso_extra")
       .order("hora_entrada", { ascending: false });
 
@@ -309,10 +337,7 @@ app.post("/api/gastos", authenticateToken, async (req, res) => {
         categoria: categoria,
         descripcion: `GASTO [${categoria.toUpperCase()}]: ${concepto} - ${descripcion || 'Sin descripción adicional'}`
       }])
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `);
+      .select("*, usuarios!operador_id(nombre, email)");
 
     if (error) throw error;
     res.json({ success: true, data });
@@ -326,10 +351,7 @@ app.get("/api/gastos", authenticateToken, async (req, res) => {
     const { fecha } = req.query;
     let query = supabase
       .from("tickets")
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `)
+      .select("*, usuarios!operador_id(nombre, email)")
       .eq("tipo_vehiculo", "gasto")
       .order("hora_entrada", { ascending: false });
 
@@ -347,107 +369,7 @@ app.get("/api/gastos", authenticateToken, async (req, res) => {
 });
 
 // ==============================
-// REPORTES FINANCIEROS COMPLETOS
-// ==============================
-
-app.get("/api/resumen/financiero", authenticateToken, async (req, res) => {
-  try {
-    const { fecha } = req.query;
-    const targetDate = fecha || new Date().toISOString().split('T')[0];
-
-    const { data: movimientos, error } = await supabase
-      .from("tickets")
-      .select(`
-        *,
-        usuarios!operador_id (nombre, email)
-      `)
-      .gte("hora_entrada", targetDate)
-      .lt("hora_entrada", `${targetDate}T23:59:59`)
-      .order("hora_entrada", { ascending: false });
-
-    if (error) throw error;
-
-    let ingresosTickets = 0;
-    let ingresosExtra = 0;
-    let gastosTotal = 0;
-
-    const movimientosDetallados = movimientos.map(mov => {
-      const monto = mov.costo_total || 0;
-      let tipo = 'vehiculo';
-      let concepto = mov.placa_vehiculo;
-
-      if (mov.tipo_vehiculo === 'ingreso_extra') {
-        ingresosExtra += monto;
-        tipo = 'ingreso_extra';
-        concepto = mov.descripcion?.replace('INGRESO EXTRA: ', '') || 'Ingreso extra';
-      } else if (mov.tipo_vehiculo === 'gasto') {
-        gastosTotal += Math.abs(monto);
-        tipo = 'gasto';
-        concepto = mov.descripcion?.replace('GASTO [', '')?.replace(']: ', ' - ') || 'Gasto';
-      } else if (mov.tipo_vehiculo === 'auto' || mov.tipo_vehiculo === 'moto') {
-        if (mov.costo_total > 0) {
-          ingresosTickets += monto;
-        }
-        tipo = 'vehiculo';
-        concepto = `${mov.placa_vehiculo} (${mov.tipo_vehiculo})`;
-      }
-
-      return {
-        id: mov.id,
-        tipo: tipo,
-        concepto: concepto,
-        monto: tipo === 'gasto' ? Math.abs(monto) : monto,
-        operador: mov.usuarios?.nombre || 'N/A',
-        fecha: mov.hora_entrada,
-        descripcion: mov.descripcion,
-        categoria: mov.categoria
-      };
-    });
-
-    const ingresosTotal = ingresosTickets + ingresosExtra;
-    const balance = ingresosTotal - gastosTotal;
-
-    const gastosPorCategoria = movimientos
-      .filter(m => m.tipo_vehiculo === 'gasto')
-      .reduce((acc, gasto) => {
-        const categoria = gasto.categoria || 'otros';
-        acc[categoria] = (acc[categoria] || 0) + Math.abs(gasto.costo_total);
-        return acc;
-      }, {});
-
-    const vehiculosActivos = movimientos.filter(m => 
-      (m.tipo_vehiculo === 'auto' || m.tipo_vehiculo === 'moto') && 
-      !m.hora_salida
-    ).length;
-
-    res.json({
-      fecha: targetDate,
-      ingresos: {
-        tickets: Math.round(ingresosTickets * 100) / 100,
-        extra: Math.round(ingresosExtra * 100) / 100,
-        total: Math.round(ingresosTotal * 100) / 100
-      },
-      gastos: {
-        total: Math.round(gastosTotal * 100) / 100,
-        porCategoria: gastosPorCategoria
-      },
-      balance: Math.round(balance * 100) / 100,
-      movimientos: movimientosDetallados,
-      metricas: {
-        vehiculos: movimientos.filter(m => m.tipo_vehiculo === 'auto' || m.tipo_vehiculo === 'moto').length,
-        ingresosExtra: movimientos.filter(m => m.tipo_vehiculo === 'ingreso_extra').length,
-        gastos: movimientos.filter(m => m.tipo_vehiculo === 'gasto').length,
-        activos: vehiculosActivos
-      }
-    });
-
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// ==============================
-// RUTAS DE ADMINISTRACIÓN
+// RUTAS DE REPORTES
 // ==============================
 
 app.get("/api/tarifas", authenticateToken, async (req, res) => {
@@ -464,53 +386,92 @@ app.get("/api/tarifas", authenticateToken, async (req, res) => {
   }
 });
 
-app.put("/api/tarifas/:id", authenticateToken, requireAdmin, async (req, res) => {
+app.get("/api/resumen/financiero", authenticateToken, async (req, res) => {
   try {
-    const { precio_primera_hora, precio_hora_extra } = req.body;
+    const today = new Date().toISOString().split('T')[0];
     
-    if (!precio_primera_hora || !precio_hora_extra) {
-      return res.status(400).json({ error: "Todos los precios son requeridos" });
-    }
-
-    const { data, error } = await supabase
-      .from("tarifas")
-      .update({ 
-        precio_primera_hora: parseFloat(precio_primera_hora),
-        precio_hora_extra: parseFloat(precio_hora_extra)
-      })
-      .eq("id", req.params.id)
-      .select();
+    const { data: movimientos, error } = await supabase
+      .from("tickets")
+      .select("*, usuarios!operador_id(nombre, email)")
+      .gte("hora_entrada", today)
+      .lt("hora_entrada", `${today}T23:59:59`)
+      .order("hora_entrada", { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
 
-app.get("/api/admin/usuarios", authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("usuarios")
-      .select("id, nombre, email, rol, created_at")
-      .order("nombre");
+    const ingresosTickets = movimientos
+      .filter(m => (m.tipo_vehiculo === 'auto' || m.tipo_vehiculo === 'moto') && m.costo_total > 0)
+      .reduce((sum, m) => sum + (m.costo_total || 0), 0);
 
-    if (error) throw error;
-    res.json(data);
+    const ingresosExtra = movimientos
+      .filter(m => m.tipo_vehiculo === 'ingreso_extra')
+      .reduce((sum, m) => sum + (m.costo_total || 0), 0);
+
+    const gastosTotal = movimientos
+      .filter(m => m.tipo_vehiculo === 'gasto')
+      .reduce((sum, m) => sum + Math.abs(m.costo_total || 0), 0);
+
+    const balance = (ingresosTickets + ingresosExtra) - gastosTotal;
+
+    res.json({
+      fecha: today,
+      ingresos: {
+        tickets: Math.round(ingresosTickets * 100) / 100,
+        extra: Math.round(ingresosExtra * 100) / 100,
+        total: Math.round((ingresosTickets + ingresosExtra) * 100) / 100
+      },
+      gastos: Math.round(gastosTotal * 100) / 100,
+      balance: Math.round(balance * 100) / 100
+    });
+
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
 // ==============================
-// Servir páginas
+// RUTAS PARA SERVIR ARCHIVOS HTML
 // ==============================
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public/login.html")));
-app.get("/dashboard", (req, res) => res.sendFile(path.join(__dirname, "public/dashboard.html")));
-app.get("/registro", (req, res) => res.sendFile(path.join(__dirname, "public/registro.html")));
-app.get("/tarifas", (req, res) => res.sendFile(path.join(__dirname, "public/tarifas.html")));
-app.get("/ingresos", (req, res) => res.sendFile(path.join(__dirname, "public/ingresos.html")));
-app.get("/gastos", (req, res) => res.sendFile(path.join(__dirname, "public/gastos.html")));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+app.get("/dashboard", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+});
+
+app.get("/registro", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "registro.html"));
+});
+
+app.get("/tarifas", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "tarifas.html"));
+});
+
+app.get("/ingresos", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "ingresos.html"));
+});
+
+app.get("/gastos", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "gastos.html"));
+});
+
+// Manejo de errores para rutas no encontradas
+app.use((req, res) => {
+  console.log(`❌ Ruta no encontrada: ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    error: "Ruta no encontrada",
+    method: req.method,
+    url: req.url 
+  });
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`📧 Credenciales de prueba:`);
+  console.log(`   👑 Admin: admin@parqueo.com / admin123`);
+  console.log(`   👨‍💼 Empleado: juan@parqueo.com / juan123`);
+  console.log(`   👩‍💼 Empleado: maria@parqueo.com / maria123`);
+});
