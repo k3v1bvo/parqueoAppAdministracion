@@ -17,6 +17,7 @@
     <div id="navLinks" class="links">
       <a href="ingresos.html">➕ Entradas</a>
       <a href="tarifas.html">💲 Tarifas</a>
+      <a href="extras.html">🧾 Ingresos extra</a>
       <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
@@ -24,7 +25,7 @@
 
   <main class="container">
     <section class="card">
-      <h2>📊 Resumen</h2>
+      <h2>📊 Resumen (Hoy)</h2>
       <div class="kpis">
         <div class="stat">
           <div class="icon icon--time">
@@ -58,8 +59,31 @@
             </svg>
           </div>
           <div>
-            <div class="value mono" id="kpiRecaudado">0</div>
-            <div class="label">Recaudado hoy</div>
+            <div class="value mono" id="kpiRecaudadoTickets">0</div>
+            <div class="label">Recaudado por tickets</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="icon" style="background:rgba(56,189,248,.18);border:2px solid rgba(56,189,248,.5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="kpiRecaudadoExtras">0</div>
+            <div class="label">Ingresos extra</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="icon" style="background:rgba(99,102,241,.18);border:2px solid rgba(99,102,241,.5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="7" r="3"></circle><circle cx="7" cy="17" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="kpiRecaudadoTotal">0</div>
+            <div class="label">Total del día (tickets + extras)</div>
           </div>
         </div>
       </div>
@@ -86,14 +110,14 @@
   <script>
     (async () => {
       await AuthUI.requireAuth();
-
-      // Mostrar link Admin solo si es admin
       if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
 
-      const { abiertosCount, ticketsHoy, recaudado } = await ParkingAPI.statsHoy();
-      document.getElementById('kpiAbiertos').textContent = abiertosCount;
-      document.getElementById('kpiHoy').textContent = ticketsHoy;
-      document.getElementById('kpiRecaudado').textContent = Number(recaudado).toFixed(2);
+      const stats = await ParkingAPI.statsHoy();
+      document.getElementById('kpiAbiertos').textContent = stats.abiertosCount;
+      document.getElementById('kpiHoy').textContent = stats.ticketsHoy;
+      document.getElementById('kpiRecaudadoTickets').textContent = Number(stats.recaudadoTickets).toFixed(2);
+      document.getElementById('kpiRecaudadoExtras').textContent = Number(stats.recaudadoExtras).toFixed(2);
+      document.getElementById('kpiRecaudadoTotal').textContent = Number(stats.recaudadoTotal).toFixed(2);
 
       const rows = await ParkingAPI.listarUltimosTickets(20);
       const tb = document.getElementById('tbodyTickets');
@@ -101,7 +125,7 @@
         const badge = r.estado === 'ingresado'
           ? '<span class="badge badge-open">Abierto ⌛</span>'
           : '<span class="badge badge-paid">Pagado ✅</span>';
-        const tipo = r.tipo_vehiculo === 'moto' ? '🛵 Moto' : '🚗 Auto';
+        const tipo = r.tipo_vehiculo === 'moto' ? '🛵 Moto' : (r.tipo_vehiculo==='bicicleta'?'🚲 Bicicleta':'🚗 Auto');
         const entrada = r.hora_entrada ? new Date(r.hora_entrada).toLocaleString() : '-';
         const salida  = r.hora_salida  ? '🕘 ' + new Date(r.hora_salida).toLocaleString() : '—';
         const total   = '💵 ' + Number(r.costo_total ?? 0).toFixed(2);

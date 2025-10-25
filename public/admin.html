@@ -16,33 +16,85 @@
     <button id="menuToggle" class="menu-toggle">☰</button>
     <div id="navLinks" class="links">
       <a href="dashboard.html">🏠 Dashboard</a>
-      <a href="ingresos.html">➕ Entradas</a>
+      <a href="ingresos.html">➕ Tickets</a>
+      <a href="extras.html">🧾 Ingresos extra</a>
       <a href="tarifas.html">💲 Tarifas</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
   </nav>
 
-  <main class="container">
+  <main class="container" id="reportRoot">
+    <!-- ACUMULADO HISTÓRICO -->
+    <section class="card">
+      <h2>🏦 Acumulado histórico (desde el inicio)</h2>
+      <div class="kpis">
+        <div class="stat">
+          <div class="icon icon--cash">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="20" height="10" rx="2"></rect><circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="accTickets">0</div>
+            <div class="label">Tickets (histórico)</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="icon" style="background:rgba(56,189,248,.18);border:2px solid rgba(56,189,248,.5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="accExtras">0</div>
+            <div class="label">Ingresos extra (histórico)</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="icon" style="background:rgba(248,113,113,.18);border:2px solid rgba(248,113,113,.5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 14l6-6"></path><path d="M15 14H9V8"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="accEgresos">0</div>
+            <div class="label">Egresos (histórico)</div>
+          </div>
+        </div>
+        <div class="stat">
+          <div class="icon" style="background:rgba(99,102,241,.18);border:2px solid rgba(99,102,241,.5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="7" r="3"></circle><circle cx="7" cy="17" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="accNeto">0</div>
+            <div class="label">Neto histórico</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESUMEN POR PERIODO -->
     <section class="card">
       <h2>📈 Resumen por periodo</h2>
-
-      <!-- Filtros -->
       <div class="row g-3 align-items-end">
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <label class="form-label">Periodo</label>
           <select id="periodo" class="form-select">
-            <option value="custom">Personalizado</option>
-            <option value="daily">Diario</option>
+            <option value="daily">Diario (hoy)</option>
             <option value="weekly">Semanal</option>
             <option value="monthly" selected>Mensual</option>
             <option value="yearly">Anual</option>
+            <option value="alltime">Desde siempre</option>
           </select>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
           <label class="form-label">Desde</label>
           <input id="fechaInicio" type="date" class="form-control">
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-2">
           <label class="form-label">Hasta</label>
           <input id="fechaFin" type="date" class="form-control">
         </div>
@@ -52,17 +104,23 @@
             <option value="">Todos</option>
           </select>
         </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Modo de gráfico</label>
+          <select id="chartMode" class="form-select">
+            <option value="combinado" selected>Combinado (Tickets/Extras/Egresos/Neto)</option>
+            <option value="pagos">Pagos (Efectivo/QR)</option>
+          </select>
+        </div>
       </div>
 
-      <div class="d-flex gap-2 mt-3 flex-wrap">
+      <div class="d-flex gap-2 mt-3">
         <button id="btnAplicar" class="btn btn-primary flex-grow-1">🔍 Aplicar</button>
-        <button id="btnCSV" class="btn btn-secondary">⬇️ CSV</button>
+        <button id="btnCSV" class="btn btn-secondary">⬇️ CSV empleados</button>
         <button id="btnPDF" class="btn btn-secondary">🧾 PDF</button>
       </div>
 
-      <!-- KPIs -->
-      <div class="row g-3 mt-3">
-        <div class="col-12 col-md-4">
+      <div class="row g-3 mt-3" id="kpiRow">
+        <div class="col-12 col-lg-3">
           <div class="stat">
             <div class="icon icon--cash">
               <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -70,107 +128,236 @@
               </svg>
             </div>
             <div>
-              <div class="value mono" id="totalPeriodo">0</div>
-              <div class="label">Total recaudado</div>
+              <div class="value mono" id="totTickets">0</div>
+              <div class="label">Tickets</div>
             </div>
           </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-12 col-lg-3">
           <div class="stat">
-            <div class="icon icon--today">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
+            <div class="icon" style="background:rgba(56,189,248,.18);border:2px solid rgba(56,189,248,.5);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
               </svg>
             </div>
             <div>
-              <div class="value" id="ticketsCerrados">0</div>
-              <div class="label">Tickets pagados</div>
+              <div class="value mono" id="totExtras">0</div>
+              <div class="label">Ingresos extra</div>
             </div>
           </div>
         </div>
-        <div class="col-6 col-md-4">
+        <div class="col-12 col-lg-3">
           <div class="stat">
-            <div class="icon icon--time">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+            <div class="icon" style="background:rgba(248,113,113,.18);border:2px solid rgba(248,113,113,.5);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 14l6-6"></path><path d="M15 14H9V8"></path>
               </svg>
             </div>
             <div>
-              <div class="value" id="abiertosPeriodo">0</div>
-              <div class="label">Aún abiertos</div>
+              <div class="value mono" id="totEgresos">0</div>
+              <div class="label">Egresos (gastos)</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-3">
+          <div class="stat">
+            <div class="icon" style="background:rgba(99,102,241,.18);border:2px solid rgba(99,102,241,.5);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="7" r="3"></circle><circle cx="7" cy="17" r="3"></circle>
+              </svg>
+            </div>
+            <div>
+              <div class="value mono" id="totNeto">0</div>
+              <div class="label">Neto (Tickets+Extras−Egresos)</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Chart -->
+      <!-- Desglose forma de pago -->
+      <div class="row g-3 mt-1">
+        <div class="col-12 col-md-6">
+          <span class="chip">💵 Efectivo: <strong class="mono" id="totEfectivo" style="margin-left:.35rem">0</strong></span>
+        </div>
+        <div class="col-12 col-md-6">
+          <span class="chip">📱 QR: <strong class="mono" id="totQR" style="margin-left:.35rem">0</strong></span>
+        </div>
+      </div>
+
       <div class="card mt-3" style="padding:1rem;">
-        <canvas id="chartPeriodo" height="110"></canvas>
+        <canvas id="chartPeriodo" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- HISTÓRICO MENSUAL (12 meses) -->
+    <section class="card">
+      <h2>🗓️ Histórico mensual (últimos 12 meses)</h2>
+      <div class="card" style="padding:1rem;">
+        <canvas id="chartMensual" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- Egresos (solo admin) -->
+    <section class="card">
+      <h2>🧾 Añadir gasto (solo admin)</h2>
+      <form id="formGasto" class="row g-3">
+        <div class="col-12 col-md-8">
+          <label class="form-label">Concepto</label>
+          <input name="concepto" class="form-control" placeholder="Ej: Compra de insumos" required />
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Monto (Bs)</label>
+          <input name="monto" type="number" step="0.01" class="form-control" placeholder="0.00" required />
+        </div>
+        <div class="col-12 d-grid">
+          <button type="submit" class="btn btn-primary">Guardar gasto</button>
+        </div>
+      </form>
+      <p id="infoGasto" class="text-muted mt-2"></p>
+    </section>
+
+    <section class="card">
+      <h2>📋 Gastos del periodo</h2>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle">
+          <thead><tr><th>Fecha</th><th>Concepto</th><th class="text-end">Monto</th></tr></thead>
+          <tbody id="tbodyGastos"></tbody>
+          <tfoot>
+            <tr><td></td><td class="text-end"><strong>Total egresos</strong></td><td class="mono text-end" id="footEgresos">0.00</td></tr>
+          </tfoot>
+        </table>
       </div>
     </section>
 
     <section class="card">
-      <h2>👥 Totales por empleado</h2>
+      <h2>👥 Totales por empleado (tickets + extras)</h2>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
-          <thead><tr><th>Empleado</th><th>Email</th><th class="text-end">Recaudado</th></tr></thead>
+          <thead><tr><th>Empleado</th><th>Email</th><th class="text-end">Tickets</th><th class="text-end">Extras</th><th class="text-end">Total</th></tr></thead>
           <tbody id="tbodyEmpleados"></tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <!-- Libs -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
   <script src="config.js"></script>
   <script src="auth.js"></script>
-
   <script>
-    let chart;
+    let chart, chartMensual;
+    let currentRange = { startISO: null, endISO: null };
+    let lastResumen = null;
 
-    async function cargarEmpleados() {
-      const lista = await ParkingAPI.listarUsuariosBasic();
-      const sel = document.getElementById('empleado');
-      sel.innerHTML = '<option value="">Todos</option>' + lista.map(u =>
-        `<option value="${u.id}">${u.nombre || '(sin nombre)'} — ${u.email}</option>`
-      ).join('');
+    function isoToDateInput(iso){
+      const d = new Date(iso); const m=(d.getMonth()+1).toString().padStart(2,'0');
+      const day=d.getDate().toString().padStart(2,'0'); return `${d.getFullYear()}-${m}-${day}`;
     }
 
-    function setPeriodoFechas(periodo) {
-      if (periodo !== 'custom') {
-        const r = ParkingAPI.rango(periodo);
-        const d1 = new Date(r.startISO), d2 = new Date(r.endISO);
-        document.getElementById('fechaInicio').value = d1.toISOString().slice(0,10);
-        document.getElementById('fechaFin').value   = d2.toISOString().slice(0,10);
+    async function loadEmpleados(){
+      const cl = supabase.createClient(window.__env.SUPABASE_URL, window.__env.SUPABASE_ANON);
+      const { data, error } = await cl.from('usuarios').select('id,nombre,email').order('nombre');
+      if(error){ console.error(error); return; }
+      const sel = document.getElementById('empleado');
+      data.forEach(u=>{
+        const op = document.createElement('option');
+        op.value = u.id; op.textContent = `${u.nombre} (${u.email||''})`;
+        sel.appendChild(op);
+      });
+    }
+
+    function buildChartData(res, mode){
+      const labels = (()=> {
+        if (mode === 'pagos') {
+          return Array.from(new Set([
+            ...Array.from(res.pagos.porDia.efectivo.keys()),
+            ...Array.from(res.pagos.porDia.qr.keys())
+          ])).sort();
+        }
+        return Array.from(new Set([
+          ...Array.from(res.porDiaTickets.keys()),
+          ...Array.from(res.porDiaExtras.keys()),
+          ...Array.from(res.porDiaEgresos.keys()),
+          ...Array.from(res.porDiaNeto.keys())
+        ])).sort();
+      })();
+
+      if (mode === 'pagos') {
+        const dataEf = labels.map(k => Number(res.pagos.porDia.efectivo.get(k)||0).toFixed(2));
+        const dataQR = labels.map(k => Number(res.pagos.porDia.qr.get(k)||0).toFixed(2));
+        return {
+          labels,
+          datasets: [
+            { label:'Efectivo', data: dataEf, tension:.3 },
+            { label:'QR',       data: dataQR, tension:.3 }
+          ]
+        };
+      } else {
+        const dataTickets = labels.map(k => Number(res.porDiaTickets.get(k)||0).toFixed(2));
+        const dataExtras  = labels.map(k => Number(res.porDiaExtras.get(k)||0).toFixed(2));
+        const dataEgresos = labels.map(k => Number(res.porDiaEgresos.get(k)||0).toFixed(2));
+        const dataNeto    = labels.map(k => Number(res.porDiaNeto.get(k)||0).toFixed(2));
+        return {
+          labels,
+          datasets: [
+            { label:'Tickets', data: dataTickets, tension:.3 },
+            { label:'Extras',  data: dataExtras,  tension:.3 },
+            { label:'Egresos', data: dataEgresos, tension:.3 },
+            { label:'Neto',    data: dataNeto,    tension:.3 }
+          ]
+        };
       }
     }
 
-    async function renderAdmin({startISO, endISO, emp}) {
-      const res = await ParkingAPI.adminResumenRango(startISO, endISO, emp || "");
+    async function renderGastos(empId=""){
+      const { startISO, endISO } = currentRange;
+      const gastos = await ParkingAPI.listarEgresosAdmin({desdeISO:startISO, hastaISO:endISO, adminId: empId || null});
+      const tb = document.getElementById('tbodyGastos');
+      let total = 0;
+      tb.innerHTML = gastos.map(g=>{
+        total += Number(g.monto||0);
+        return `<tr>
+          <td>${new Date(g.creado_at).toLocaleString()}</td>
+          <td>${g.concepto}</td>
+          <td class="mono text-end">${Number(g.monto||0).toFixed(2)}</td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="3" class="text-muted">Sin gastos en el periodo</td></tr>`;
+      document.getElementById('footEgresos').textContent = total.toFixed(2);
+    }
 
-      // KPIs
-      document.getElementById('totalPeriodo').textContent    = Number(res.total).toFixed(2);
-      document.getElementById('ticketsCerrados').textContent = res.cerrados;
-      document.getElementById('abiertosPeriodo').textContent = res.abiertos;
+    async function renderByRange(startISO, endISO, empId=""){
+      await AuthUI.requireAdmin();
+      currentRange = { startISO, endISO };
 
-      // Series por día
-      const labels = Array.from(res.porDia.keys()).sort();
-      const values = labels.map(k => Number(res.porDia.get(k)||0).toFixed(2));
+      const res = await ParkingAPI.adminResumenRango(startISO, endISO, empId);
+      lastResumen = res;
 
+      // KPIs del periodo
+      document.getElementById('totTickets').textContent = Number(res.tickets_total).toFixed(2);
+      document.getElementById('totExtras').textContent  = Number(res.extras_total).toFixed(2);
+      document.getElementById('totEgresos').textContent = Number(res.egresos_total).toFixed(2);
+      document.getElementById('totNeto').textContent    = Number(res.neto_total).toFixed(2);
+
+      document.getElementById('totEfectivo').textContent = Number(res.pagos.efectivo).toFixed(2);
+      document.getElementById('totQR').textContent       = Number(res.pagos.qr).toFixed(2);
+
+      // Fechas a inputs
+      document.getElementById('fechaInicio').value = isoToDateInput(res.rango.startISO);
+      document.getElementById('fechaFin').value    = isoToDateInput(res.rango.endISO);
+
+      // Chart (modo)
+      const mode = document.getElementById('chartMode').value;
+      const cfg = buildChartData(res, mode);
       const ctx = document.getElementById('chartPeriodo');
       if(chart) chart.destroy();
       chart = new Chart(ctx, {
         type: 'line',
-        data: { labels, datasets: [{ label:'Recaudado', data: values, tension:.3 }] },
+        data: cfg,
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
           scales: {
             x: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } },
             y: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } }
@@ -179,83 +366,219 @@
         }
       });
 
-      // Tabla por empleado
-      const usuarios = await ParkingAPI.listarUsuariosBasic();
-      const map = new Map(usuarios.map(u=>[u.id,u]));
-      const rows = Array.from(res.porEmpleado.entries())
-        .sort((a,b)=>b[1]-a[1])
-        .map(([id,total])=>{
-          const u = map.get(id) || {nombre:'(sin nombre)', email:''};
-          return `<tr><td>${u.nombre}</td><td>${u.email}</td><td class="mono text-end">${Number(total).toFixed(2)}</td></tr>`;
-        }).join('');
-      document.getElementById('tbodyEmpleados').innerHTML = rows || `<tr><td colspan="3" class="text-muted">Sin datos</td></tr>`;
+      // Tabla de gastos
+      await renderGastos(empId);
+
+      // Tabla por empleado (tickets + extras)
+      const cl = supabase.createClient(window.__env.SUPABASE_URL, window.__env.SUPABASE_ANON);
+      const users = await cl.from('usuarios').select('id,nombre,email');
+      const mapU = new Map((users.data||[]).map(u=>[u.id,u]));
+      const rows = Array.from(res.porEmpleadoCombined.entries())
+        .map(([id,tot])=>({id, ...tot, nombre:(mapU.get(id)?.nombre||'(sin nombre)'), email:(mapU.get(id)?.email||'')}))
+        .sort((a,b)=>b.total-a.total);
+
+      const tb = document.getElementById('tbodyEmpleados');
+      tb.innerHTML = rows.map(r=>`
+        <tr>
+          <td>${r.nombre}</td>
+          <td>${r.email}</td>
+          <td class="mono text-end">${Number(r.tickets).toFixed(2)}</td>
+          <td class="mono text-end">${Number(r.extras).toFixed(2)}</td>
+          <td class="mono text-end">${Number(r.total).toFixed(2)}</td>
+        </tr>
+      `).join('') || `<tr><td colspan="5" class="text-muted">Sin datos</td></tr>`;
     }
 
-    // Exportar CSV (tabla empleados)
-    function exportCSV() {
-      const rows = [...document.querySelectorAll('#tbodyEmpleados tr')];
-      let csv = "Empleado,Email,Recaudado\n";
-      rows.forEach(r=>{
-        const cols = [...r.querySelectorAll('td')].map(td=>td.innerText.replace(/,/g,''));
-        if(cols.length) csv += cols.join(",") + "\n";
+    async function renderAcumulado(){
+      const acc = await ParkingAPI.acumuladoGlobal();
+      document.getElementById('accTickets').textContent = acc.totalTickets.toFixed(2);
+      document.getElementById('accExtras').textContent  = acc.totalExtras.toFixed(2);
+      document.getElementById('accEgresos').textContent = acc.totalEgresos.toFixed(2);
+      document.getElementById('accNeto').textContent    = acc.neto.toFixed(2);
+    }
+
+    async function renderMensual(){
+      const res = await ParkingAPI.historicoMensual(12);
+      const ctx = document.getElementById('chartMensual');
+      if(chartMensual) chartMensual.destroy();
+      chartMensual = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: res.labels,
+          datasets: [
+            { label:'Tickets', data: res.tickets },
+            { label:'Extras',  data: res.extras },
+            { label:'Egresos', data: res.egresos },
+            { label:'Neto',    data: res.neto }
+          ]
+        },
+        options: {
+          scales: {
+            x: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } },
+            y: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } }
+          },
+          plugins:{ legend:{ labels:{ color:'#f0f6fc' } } }
+        }
       });
-      const blob = new Blob([csv], {type:"text/csv"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = "reporte_admin.csv"; a.click();
-      URL.revokeObjectURL(url);
     }
 
-    // Exportar PDF (chart + KPIs)
-    async function exportPDF() {
-      const pdf = new jspdf.jsPDF({orientation:"p",unit:"pt",format:"a4"});
-      pdf.text("Reporte de Parqueo", 40, 40);
-      const kpis = `Total: ${document.getElementById('totalPeriodo').innerText} | Pagados: ${document.getElementById('ticketsCerrados').innerText} | Abiertos: ${document.getElementById('abiertosPeriodo').innerText}`;
-      pdf.text(kpis, 40, 60);
-
-      const chartCanvas = document.getElementById('chartPeriodo');
-      const canvas = await html2canvas(chartCanvas.parentElement); // captura el contenedor del gráfico
-      const img = canvas.toDataURL("image/png");
-      const w = 520, h = (canvas.height * w) / canvas.width;
-      pdf.addImage(img, "PNG", 40, 80, w, h);
-
-      pdf.save("reporte_parqueo.pdf");
+    async function render(periodo){
+      const r = ParkingAPI.rango(periodo);
+      const empId = document.getElementById('empleado').value;
+      await renderByRange(r.startISO, r.endISO, empId);
     }
 
     (async ()=>{
       await AuthUI.requireAdmin();
+      await loadEmpleados();
 
-      // Cargar lista empleados
-      await cargarEmpleados();
+      // ACUMULADO histórico + gráfico mensual
+      await renderAcumulado();
+      await renderMensual();
 
-      // Set de fechas iniciales (mensual por defecto)
-      setPeriodoFechas('monthly');
-
-      // Eventos
-      document.getElementById('periodo').addEventListener('change', (e)=>{
-        setPeriodoFechas(e.target.value);
+      // set periodo inicial
+      const sel = document.getElementById('periodo');
+      sel.addEventListener('change', async ()=>{
+        const val = sel.value;
+        const {startISO, endISO} = ParkingAPI.rango(val);
+        document.getElementById('fechaInicio').value = isoToDateInput(startISO);
+        document.getElementById('fechaFin').value    = isoToDateInput(endISO);
       });
+
+      // aplicar rango/empleado
       document.getElementById('btnAplicar').addEventListener('click', async ()=>{
-        const periodo = document.getElementById('periodo').value;
-        let startISO, endISO;
-        if (periodo === 'custom') {
-          const fi = document.getElementById('fechaInicio').value;
-          const ff = document.getElementById('fechaFin').value;
-          if(!fi || !ff) { toast("Selecciona fechas inicio y fin.", false); return; }
-          startISO = new Date(fi+"T00:00:00").toISOString();
-          endISO   = new Date(ff+"T23:59:59").toISOString();
-        } else {
-          const r = ParkingAPI.rango(periodo); startISO = r.startISO; endISO = r.endISO;
-        }
-        const emp = document.getElementById('empleado').value;
-        await renderAdmin({startISO, endISO, emp});
+        const fi = document.getElementById('fechaInicio').value;
+        const ff = document.getElementById('fechaFin').value;
+        const empId = document.getElementById('empleado').value;
+        if(!fi || !ff){ toast('Selecciona fecha inicio y fin', false); return; }
+        await renderByRange(new Date(fi).toISOString(), new Date(ff).toISOString(), empId);
       });
 
-      document.getElementById('btnCSV').addEventListener('click', exportCSV);
-      document.getElementById('btnPDF').addEventListener('click', exportPDF);
+      // cambiar modo de gráfico
+      document.getElementById('chartMode').addEventListener('change', async ()=>{
+        if(!lastResumen) return;
+        const cfg = (()=>{
+          const labels = (()=> {
+            if (document.getElementById('chartMode').value === 'pagos') {
+              return Array.from(new Set([
+                ...Array.from(lastResumen.pagos.porDia.efectivo.keys()),
+                ...Array.from(lastResumen.pagos.porDia.qr.keys())
+              ])).sort();
+            }
+            return Array.from(new Set([
+              ...Array.from(lastResumen.porDiaTickets.keys()),
+              ...Array.from(lastResumen.porDiaExtras.keys()),
+              ...Array.from(lastResumen.porDiaEgresos.keys()),
+              ...Array.from(lastResumen.porDiaNeto.keys())
+            ])).sort();
+          })();
 
-      // Primera render mensual
-      const r0 = ParkingAPI.rango('monthly');
-      await renderAdmin({startISO:r0.startISO, endISO:r0.endISO, emp:""});
+          if (document.getElementById('chartMode').value === 'pagos') {
+            const dataEf = labels.map(k => Number(lastResumen.pagos.porDia.efectivo.get(k)||0).toFixed(2));
+            const dataQR = labels.map(k => Number(lastResumen.pagos.porDia.qr.get(k)||0).toFixed(2));
+            return { labels, datasets: [
+              { label:'Efectivo', data: dataEf, tension:.3 },
+              { label:'QR',       data: dataQR, tension:.3 }
+            ]};
+          } else {
+            const dataTickets = labels.map(k => Number(lastResumen.porDiaTickets.get(k)||0).toFixed(2));
+            const dataExtras  = labels.map(k => Number(lastResumen.porDiaExtras.get(k)||0).toFixed(2));
+            const dataEgresos = labels.map(k => Number(lastResumen.porDiaEgresos.get(k)||0).toFixed(2));
+            const dataNeto    = labels.map(k => Number(lastResumen.porDiaNeto.get(k)||0).toFixed(2));
+            return { labels, datasets: [
+              { label:'Tickets', data: dataTickets, tension:.3 },
+              { label:'Extras',  data: dataExtras,  tension:.3 },
+              { label:'Egresos', data: dataEgresos, tension:.3 },
+              { label:'Neto',    data: dataNeto,    tension:.3 }
+            ]};
+          }
+        })();
+
+        const ctx = document.getElementById('chartPeriodo');
+        if(chart) chart.destroy();
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: cfg,
+          options: {
+            scales: {
+              x: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } },
+              y: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } }
+            },
+            plugins:{ legend:{ labels:{ color:'#f0f6fc' } } }
+          }
+        });
+      });
+
+      // CSV empleados
+      document.getElementById('btnCSV').addEventListener('click', ()=>{
+        const rows = document.querySelectorAll('#tbodyEmpleados tr');
+        let csv = "Empleado,Email,Tickets,Extras,Total\n";
+        rows.forEach(r=>{
+          const cols = [...r.querySelectorAll('td')].map(td => td.innerText.replace(/,/g,'.'));
+          if (cols.length===5) csv += `${cols[0]},${cols[1]},${cols[2]},${cols[3]},${cols[4]}\n`;
+        });
+        const blob = new Blob([csv], {type:"text/csv"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href=url; a.download="admin_totales_por_empleado.csv"; a.click();
+      });
+
+      // Export PDF (reporte completo)
+      document.getElementById('btnPDF').addEventListener('click', async ()=>{
+        const root = document.getElementById('reportRoot');
+        const canvas = await html2canvas(root, {scale:2, backgroundColor:null, useCORS:true});
+        const imgData = canvas.toDataURL('image/png');
+
+        const pdf = new jspdf.jsPDF({orientation:"p", unit:"pt", format:"a4"});
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+
+        const imgW = pageW - 40;
+        const ratio = canvas.height / canvas.width;
+        let imgH = imgW * ratio;
+
+        if (imgH <= pageH - 40) {
+          pdf.addImage(imgData, 'PNG', 20, 20, imgW, imgH);
+        } else {
+          let y = 20, remaining = imgH;
+          while (remaining > 0) {
+            pdf.addImage(imgData, 'PNG', 20, 20, imgW, imgH);
+            remaining -= (pageH - 40);
+            if (remaining > 0) pdf.addPage();
+          }
+        }
+        pdf.save('reporte_admin.pdf');
+      });
+
+      // Guardar gasto
+      document.getElementById('formGasto').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const f = e.target;
+        try{
+          await ParkingAPI.crearEgresoAdmin({ concepto: f.concepto.value.trim(), monto: f.monto.value });
+          toast('Gasto guardado');
+          f.reset();
+          const empId = document.getElementById('empleado').value;
+          await renderByRange(currentRange.startISO, currentRange.endISO, empId);
+          await renderAcumulado();
+          await renderMensual();
+        }catch(err){
+          toast(err?.message||String(err), false);
+        }
+      });
+
+      // Toggle móvil
+      document.getElementById('menuToggle').addEventListener('click', ()=>{
+        document.getElementById('navLinks').classList.toggle('open');
+      });
+
+      // Primera carga: mensual
+      const r = ParkingAPI.rango('monthly');
+      document.getElementById('fechaInicio').value = isoToDateInput(r.startISO);
+      document.getElementById('fechaFin').value    = isoToDateInput(r.endISO);
+
+      await renderAcumulado();
+      await renderMensual();
+      await render('monthly');
     })();
   </script>
 </body>

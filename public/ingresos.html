@@ -3,93 +3,74 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Entradas / Salidas</title>
+  <title>Entradas / Salidas - Parqueo</title>
   <link rel="stylesheet" href="style.css" />
   <div id="toast" class="toast"></div>
 </head>
 <body>
+  <!-- ÚNICO NAVBAR -->
   <nav class="topbar">
     <strong>🚘 ParqueoApp</strong>
     <span id="currentUser"></span>
     <div class="spacer"></div>
-    <div class="nav-links">
+
+    <button id="menuToggle" class="menu-toggle">☰</button>
+    <div id="navLinks" class="links">
       <a href="dashboard.html">🏠 Dashboard</a>
       <a href="tarifas.html">💲 Tarifas</a>
-      <a href="extras.html">➕ Ingresos extra</a>
+      <a href="extras.html">🧾 Ingresos extra</a>
+      <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
-    <button class="menu-toggle" id="menuToggle">☰</button>
   </nav>
-  <div class="mobile-menu" id="mobileMenu">
-    <a href="dashboard.html">🏠 Dashboard</a>
-    <a href="tarifas.html">💲 Tarifas</a>
-    <a href="extras.html">➕ Ingresos extra</a>
-    <button onclick="AuthUI.logout()">Salir</button>
-  </div>
 
   <main class="container">
-    <div class="row g-3">
-      <section class="col-12 col-md-6">
+    <div class="row g-4">
+      <!-- Abrir ticket -->
+      <section class="col-12 col-lg-6">
         <div class="card">
           <h2>➕ Abrir ticket (Entrada)</h2>
-          <form id="formEntrada" class="row g-3">
-            <div class="col-12">
-              <label class="form-label">Placa</label>
-              <input name="placa" class="form-control" placeholder="Ej: ABC 123" required />
-            </div>
-            <div class="col-12">
-              <label class="form-label">Tipo de vehículo</label>
-              <select name="tipoVehiculo" class="form-select">
-                <option value="auto">Auto</option>
-                <option value="moto">Moto</option>
-              </select>
-            </div>
-            <div class="col-12 d-grid">
-              <button type="submit" class="btn btn-primary">Abrir ticket</button>
-            </div>
-          </form>
-          <p id="infoEntrada" class="text-muted mt-2"></p>
+
+          <label class="form-label">Placa</label>
+          <input id="inPlaca" class="form-control" placeholder="Ej: ABC 123" />
+
+          <label class="form-label mt-2">Tipo de vehículo</label>
+          <select id="inTipo" class="form-select">
+            <option value="auto">Auto</option>
+            <option value="moto">Moto</option>
+            <option value="bicicleta">Bicicleta</option>
+          </select>
+
+          <button id="btnAbrir" class="btn btn-success mt-3">Abrir ticket</button>
         </div>
       </section>
 
-      <section class="col-12 col-md-6">
+      <!-- Cerrar ticket -->
+      <section class="col-12 col-lg-6">
         <div class="card">
-          <h2>✔️ Cerrar ticket (Salida)</h2>
-          <form id="formSalida" class="row g-3">
-            <div class="col-12">
-              <label class="form-label">Placa</label>
-              <input name="placa" class="form-control" placeholder="Ej: abc 123" required />
-            </div>
-            <div class="col-12">
-              <label class="form-label">Tipo de pago</label>
-              <div class="d-flex gap-3">
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="tipoPago" id="pagoEfe" value="efectivo" checked>
-                  <label class="form-check-label" for="pagoEfe">🪙 Efectivo</label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="tipoPago" id="pagoQR" value="qr">
-                  <label class="form-check-label" for="pagoQR">📱 QR</label>
-                </div>
-              </div>
-            </div>
-            <div class="col-12 d-grid">
-              <button type="submit" class="btn btn-primary">Cerrar ticket</button>
-            </div>
-          </form>
-          <p id="infoSalida" class="text-muted mt-2"></p>
+          <h2>✅ Cerrar ticket (Salida)</h2>
+
+          <label class="form-label">Placa</label>
+          <input id="outPlaca" class="form-control" placeholder="Ej: abc 123" />
+
+          <label class="form-label mt-2">Tipo de pago</label>
+          <div class="radio-group">
+            <label><input type="radio" name="pay" value="efectivo" checked /> 💵 Efectivo</label>
+            <label><input type="radio" name="pay" value="qr" /> 📱 QR</label>
+          </div>
+
+          <button id="btnCerrar" class="btn btn-success mt-3">Cerrar ticket</button>
         </div>
       </section>
     </div>
 
-    <section class="card">
-      <h2>⌛ Tickets abiertos</h2>
+    <!-- Abiertos -->
+    <section class="card mt-4">
+      <h2>⏳ Tickets abiertos</h2>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
           <thead>
-            <tr>
-              <th>Placa</th><th>Tipo</th><th>Entrada</th><th>Estado</th>
-            </tr>
+            <tr><th>Placa</th><th>Tipo</th><th>Entrada</th><th>Estado</th></tr>
           </thead>
           <tbody id="tbodyAbiertos"></tbody>
         </table>
@@ -98,78 +79,63 @@
     </section>
   </main>
 
-  <script>
-    const menuToggle=document.getElementById('menuToggle');
-    const mobileMenu=document.getElementById('mobileMenu');
-    menuToggle?.addEventListener('click',()=>document.body.classList.toggle('mobile-open'));
-    mobileMenu?.addEventListener('click',()=>document.body.classList.remove('mobile-open'));
-  </script>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
-    (async () => {
+    (async ()=>{
       await AuthUI.requireAuth();
+      if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
 
-      document.querySelectorAll('input[name="placa"]').forEach(inp=>{
-        inp.addEventListener('input', ()=>{ inp.value = inp.value.toUpperCase(); });
-      });
-
-      const infoEntrada = document.getElementById('infoEntrada');
-      const infoSalida  = document.getElementById('infoSalida');
-
-      document.getElementById('formEntrada').addEventListener('submit', async (e)=>{
-        e.preventDefault();
-        const f = e.target;
+      // abrir
+      document.getElementById('btnAbrir').addEventListener('click', async ()=>{
+        const placa = document.getElementById('inPlaca').value;
+        const tipo  = document.getElementById('inTipo').value;
         try{
-          const id = await ParkingAPI.abrirTicket({
-            placa: f.placa.value,
-            tipoVehiculo: f.tipoVehiculo.value
-          });
-          infoEntrada.textContent = '✅ Ticket abierto: ' + id;
+          await ParkingAPI.abrirTicket({ placa, tipoVehiculo: tipo });
           toast('Ticket abierto');
-          f.reset();
-          renderAbiertos();
-        }catch(err){
-          const msg = err?.message || String(err);
-          infoEntrada.textContent = '❌ ' + msg;
-          toast(msg,false);
-        }
+          document.getElementById('inPlaca').value='';
+          await cargarAbiertos();
+        }catch(e){ toast(e.message||String(e), false); }
       });
 
-      document.getElementById('formSalida').addEventListener('submit', async (e)=>{
-        e.preventDefault();
-        const f = e.target;
+      // cerrar
+      document.getElementById('btnCerrar').addEventListener('click', async ()=>{
+        const placa = document.getElementById('outPlaca').value;
+        const forma = document.querySelector('input[name="pay"]:checked').value;
         try{
-          const pago = f.tipoPago.value || 'efectivo';
-          const { id, costo, tipo_pago } = await ParkingAPI.cerrarTicketPorPlaca(f.placa.value, pago);
-          infoSalida.textContent = `✅ Ticket cerrado: ${id} — Total: ${costo} — Pago: ${tipo_pago}`;
-          toast('Ticket cerrado: '+costo);
-          f.reset();
-          renderAbiertos();
-        }catch(err){
-          const msg = err?.message || String(err);
-          infoSalida.textContent = '❌ ' + msg;
-          toast(msg,false);
-        }
+          const res = await ParkingAPI.cerrarTicketPorPlaca(placa, forma);
+          toast(`Ticket cerrado: ${res.formaPago} Bs ${res.costo.toFixed(2)}`);
+          document.getElementById('outPlaca').value='';
+          await cargarAbiertos();
+        }catch(e){ toast(e.message||String(e), false); }
       });
 
-      async function renderAbiertos(){
-        try{
-          const rows = (await ParkingAPI.listarUltimosTickets(200)).filter(r => r.estado === 'ingresado');
-          const tb = document.getElementById('tbodyAbiertos');
-          tb.innerHTML = rows.length ? rows.map(r=>`
-            <tr>
-              <td class="mono">${r.placa_vehiculo}</td>
-              <td>${r.tipo_vehiculo === 'moto' ? '🛵 Moto' : '🚗 Auto'}</td>
-              <td>${r.hora_entrada ? new Date(r.hora_entrada).toLocaleString() : '-'}</td>
-              <td><span class="badge badge-open">Abierto ⌛</span></td>
-            </tr>`).join('') : `<tr><td colspan="4" class="text-muted">No hay tickets abiertos</td></tr>`;
-        }catch(e){ console.error(e); }
+      async function cargarAbiertos(){
+        const rows = await supabase
+          .from('tickets')
+          .select('placa_vehiculo,tipo_vehiculo,hora_entrada,estado')
+          .eq('estado','ingresado')
+          .order('hora_entrada',{ascending:false});
+        const tb = document.getElementById('tbodyAbiertos');
+        if(rows.error){ tb.innerHTML = `<tr><td colspan="4" class="text-muted">Error: ${rows.error.message}</td></tr>`; return; }
+        tb.innerHTML = (rows.data||[]).map(r=>`
+          <tr>
+            <td class="mono">${r.placa_vehiculo}</td>
+            <td>${r.tipo_vehiculo==='moto'?'🛵 Moto': (r.tipo_vehiculo==='bicicleta'?'🚲 Bicicleta':'🚗 Auto')}</td>
+            <td>${new Date(r.hora_entrada).toLocaleString()}</td>
+            <td><span class="badge badge-open">Abierto</span></td>
+          </tr>
+        `).join('') || `<tr><td colspan="4" class="text-muted">No hay tickets abiertos</td></tr>`;
       }
 
-      renderAbiertos();
+      // primera carga
+      await cargarAbiertos();
+
+      // toggle móvil
+      document.getElementById('menuToggle').addEventListener('click', ()=>{
+        document.getElementById('navLinks').classList.toggle('open');
+      });
     })();
   </script>
 </body>
