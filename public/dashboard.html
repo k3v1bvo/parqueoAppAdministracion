@@ -1,355 +1,121 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - ParkingPro</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel de Parqueo</title>
+  <link rel="stylesheet" href="style.css" />
+  <div id="toast" class="toast"></div>
 </head>
 <body>
-    <header class="header">
-        <nav class="nav">
-            <div class="logo">
-                <div class="logo-icon">📊</div>
-                <span>ParkingPro Dashboard</span>
-            </div>
-            <div class="nav-user">
-                <span id="userName">Cargando...</span>
-                <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
-            </div>
-        </nav>
-    </header>
+  <nav class="topbar">
+    <strong>🚘 ParqueoApp</strong>
+    <span id="currentUser"></span>
+    <div class="spacer"></div>
 
-    <main class="container">
-        <!-- Estadísticas en Tiempo Real -->
-        <div class="stats-grid">
-            <div class="stat-card fade-in" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                <div class="stat-number" id="ingresosTotal">0.00</div>
-                <div class="stat-label">Ingresos Totales Hoy (Bs)</div>
-            </div>
-            
-            <div class="stat-card fade-in" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                <div class="stat-number" id="ingresosTickets">0.00</div>
-                <div class="stat-label">Por Tickets (Bs)</div>
-            </div>
-            
-            <div class="stat-card fade-in" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
-                <div class="stat-number" id="ingresosExtra">0.00</div>
-                <div class="stat-label">Ingresos Extra (Bs)</div>
-            </div>
-            
-            <div class="stat-card fade-in" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
-                <div class="stat-number" id="gastosTotal">0.00</div>
-                <div class="stat-label">Gastos Hoy (Bs)</div>
-            </div>
-            
-            <div class="stat-card fade-in" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
-                <div class="stat-number" id="balance">0.00</div>
-                <div class="stat-label">Balance Final (Bs)</div>
-            </div>
+    <button id="menuToggle" class="menu-toggle">☰</button>
+    <div id="navLinks" class="links">
+      <a href="ingresos.html">➕ Entradas</a>
+      <a href="tarifas.html">💲 Tarifas</a>
+      <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
+      <button onclick="AuthUI.logout()">Salir</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="card">
+      <h2>📊 Resumen</h2>
+      <div class="kpis">
+        <div class="stat">
+          <div class="icon icon--time">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div>
+            <div class="value" id="kpiAbiertos">0</div>
+            <div class="label">Tickets abiertos</div>
+          </div>
         </div>
-
-        <!-- Controles Rápidos -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h2 class="card-title">Acciones Rápidas</h2>
-                <div>
-                    <button class="btn btn-primary btn-sm" onclick="actualizarDashboard()">
-                        🔄 Actualizar Todo
-                    </button>
-                </div>
-            </div>
-            
-            <div class="quick-actions">
-                <button class="btn btn-success" onclick="window.location.href='/registro'">
-                    🚗 Registrar Vehículo
-                </button>
-                <button class="btn btn-warning" onclick="window.location.href='/ingresos'">
-                    ➕ Ingreso Extra
-                </button>
-                <button class="btn btn-danger" onclick="window.location.href='/gastos'">
-                    💸 Registrar Gasto
-                </button>
-                <button class="btn btn-secondary" onclick="window.location.href='/tarifas'">
-                    ⚙️ Tarifas
-                </button>
-            </div>
+        <div class="stat">
+          <div class="icon icon--today">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </div>
+          <div>
+            <div class="value" id="kpiHoy">0</div>
+            <div class="label">Tickets creados hoy</div>
+          </div>
         </div>
-
-        <!-- Resumen Detallado -->
-        <div class="dashboard-grid">
-            <!-- Vehículos Activos -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">🚗 Vehículos Activos</h3>
-                    <span class="badge badge-success" id="countActivos">0</span>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Placa</th>
-                                <th>Tipo</th>
-                                <th>Hora Entrada</th>
-                                <th>Operador</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaActivos">
-                            <tr><td colspan="4" class="text-center">Cargando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Últimos Ingresos Extra -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">💰 Últimos Ingresos Extra</h3>
-                    <span class="badge badge-warning" id="countIngresos">0</span>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Concepto</th>
-                                <th>Monto</th>
-                                <th>Fecha</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaIngresos">
-                            <tr><td colspan="3" class="text-center">Cargando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Últimos Gastos -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">💸 Últimos Gastos</h3>
-                    <span class="badge badge-danger" id="countGastos">0</span>
-                </div>
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Concepto</th>
-                                <th>Categoría</th>
-                                <th>Monto</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaGastos">
-                            <tr><td colspan="3" class="text-center">Cargando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div class="stat">
+          <div class="icon icon--cash">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="20" height="10" rx="2"></rect><circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <div class="value mono" id="kpiRecaudado">0</div>
+            <div class="label">Recaudado hoy</div>
+          </div>
         </div>
+      </div>
+    </section>
 
-        <!-- Movimientos del Día -->
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">📋 Movimientos del Día</h2>
-            </div>
-            <div class="table-container">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Tipo</th>
-                            <th>Concepto</th>
-                            <th>Monto</th>
-                            <th>Operador</th>
-                            <th>Hora</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tablaMovimientos">
-                        <tr><td colspan="5" class="text-center">Cargando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+    <section class="card">
+      <h2>🧾 Tickets recientes</h2>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle">
+          <thead>
+            <tr>
+              <th>Placa</th><th>Tipo</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTickets"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 
-    <script src="auth.js"></script>
-    <script>
-        async function actualizarDashboard() {
-            await cargarResumenFinanciero();
-            await cargarVehiculosActivos();
-            await cargarUltimosIngresos();
-            await cargarUltimosGastos();
-            await cargarMovimientosDelDia();
-        }
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async () => {
+      await AuthUI.requireAuth();
 
-        async function cargarResumenFinanciero() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/resumen/financiero', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (!res.ok) throw new Error('Error al cargar resumen');
-                
-                const data = await res.json();
-                
-                document.getElementById('ingresosTotal').textContent = data.ingresos.total.toFixed(2);
-                document.getElementById('ingresosTickets').textContent = data.ingresos.tickets.toFixed(2);
-                document.getElementById('ingresosExtra').textContent = data.ingresos.extra.toFixed(2);
-                document.getElementById('gastosTotal').textContent = data.gastos.total.toFixed(2);
-                document.getElementById('balance').textContent = data.balance.toFixed(2);
-                
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
+      // Mostrar link Admin solo si es admin
+      if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
 
-        async function cargarVehiculosActivos() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/tickets/activos', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                const vehiculos = await res.json();
-                const tabla = document.getElementById('tablaActivos');
-                const count = document.getElementById('countActivos');
-                
-                count.textContent = vehiculos.length;
-                
-                if (vehiculos.length === 0) {
-                    tabla.innerHTML = '<tr><td colspan="4" class="text-center">No hay vehículos activos</td></tr>';
-                    return;
-                }
-                
-                tabla.innerHTML = vehiculos.slice(0, 5).map(v => `
-                    <tr>
-                        <td><strong>${v.placa_vehiculo}</strong></td>
-                        <td><span class="badge ${v.tipo_vehiculo === 'auto' ? 'badge-success' : 'badge-warning'}">${v.tipo_vehiculo}</span></td>
-                        <td>${new Date(v.hora_entrada).toLocaleTimeString()}</td>
-                        <td>${v.usuarios?.nombre || 'N/A'}</td>
-                    </tr>
-                `).join('');
-                
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
+      const { abiertosCount, ticketsHoy, recaudado } = await ParkingAPI.statsHoy();
+      document.getElementById('kpiAbiertos').textContent = abiertosCount;
+      document.getElementById('kpiHoy').textContent = ticketsHoy;
+      document.getElementById('kpiRecaudado').textContent = Number(recaudado).toFixed(2);
 
-        async function cargarUltimosIngresos() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/ingresos?limit=5', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                const ingresos = await res.json();
-                const tabla = document.getElementById('tablaIngresos');
-                const count = document.getElementById('countIngresos');
-                
-                count.textContent = ingresos.length;
-                
-                if (ingresos.length === 0) {
-                    tabla.innerHTML = '<tr><td colspan="3" class="text-center">No hay ingresos extra</td></tr>';
-                    return;
-                }
-                
-                tabla.innerHTML = ingresos.slice(0, 5).map(i => `
-                    <tr>
-                        <td>${i.descripcion ? i.descripcion.replace('INGRESO EXTRA: ', '') : 'Ingreso extra'}</td>
-                        <td><strong>${i.costo_total.toFixed(2)} Bs</strong></td>
-                        <td>${new Date(i.hora_entrada).toLocaleDateString()}</td>
-                    </tr>
-                `).join('');
-                
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        async function cargarUltimosGastos() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/gastos?limit=5', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                const gastos = await res.json();
-                const tabla = document.getElementById('tablaGastos');
-                const count = document.getElementById('countGastos');
-                
-                count.textContent = gastos.length;
-                
-                if (gastos.length === 0) {
-                    tabla.innerHTML = '<tr><td colspan="3" class="text-center">No hay gastos</td></tr>';
-                    return;
-                }
-                
-                tabla.innerHTML = gastos.slice(0, 5).map(g => `
-                    <tr>
-                        <td>${g.descripcion ? g.descripcion.replace('GASTO [', '').split(']: ')[1] : 'Gasto'}</td>
-                        <td><span class="badge badge-secondary">${g.categoria || 'otros'}</span></td>
-                        <td><strong>${Math.abs(g.costo_total).toFixed(2)} Bs</strong></td>
-                    </tr>
-                `).join('');
-                
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        async function cargarMovimientosDelDia() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/resumen/financiero', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                const data = await res.json();
-                const tabla = document.getElementById('tablaMovimientos');
-                
-                if (data.movimientos.length === 0) {
-                    tabla.innerHTML = '<tr><td colspan="5" class="text-center">No hay movimientos hoy</td></tr>';
-                    return;
-                }
-                
-                tabla.innerHTML = data.movimientos.slice(0, 10).map(m => `
-                    <tr>
-                        <td>
-                            <span class="badge ${
-                                m.tipo === 'ingreso_extra' ? 'badge-warning' : 
-                                m.tipo === 'gasto' ? 'badge-danger' : 'badge-success'
-                            }">
-                                ${m.tipo}
-                            </span>
-                        </td>
-                        <td>${m.concepto}</td>
-                        <td><strong>${m.monto.toFixed(2)} Bs</strong></td>
-                        <td>${m.operador}</td>
-                        <td>${new Date(m.fecha).toLocaleTimeString()}</td>
-                    </tr>
-                `).join('');
-                
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/';
-        }
-
-        // Inicializar dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            document.getElementById('userName').textContent = `${user.nombre} (${user.rol})`;
-            
-            actualizarDashboard();
-            setInterval(actualizarDashboard, 30000); // Actualizar cada 30 segundos
-        });
-    </script>
+      const rows = await ParkingAPI.listarUltimosTickets(20);
+      const tb = document.getElementById('tbodyTickets');
+      tb.innerHTML = rows.map(r => {
+        const badge = r.estado === 'ingresado'
+          ? '<span class="badge badge-open">Abierto ⌛</span>'
+          : '<span class="badge badge-paid">Pagado ✅</span>';
+        const tipo = r.tipo_vehiculo === 'moto' ? '🛵 Moto' : '🚗 Auto';
+        const entrada = r.hora_entrada ? new Date(r.hora_entrada).toLocaleString() : '-';
+        const salida  = r.hora_salida  ? '🕘 ' + new Date(r.hora_salida).toLocaleString() : '—';
+        const total   = '💵 ' + Number(r.costo_total ?? 0).toFixed(2);
+        return `
+          <tr>
+            <td class="mono">${r.placa_vehiculo}</td>
+            <td>${tipo}</td>
+            <td>${badge}</td>
+            <td>${entrada}</td>
+            <td>${salida}</td>
+            <td class="mono">${total}</td>
+          </tr>`;
+      }).join('');
+    })();
+  </script>
 </body>
 </html>

@@ -1,226 +1,75 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tarifas - ParkingPro</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tarifas</title>
+  <link rel="stylesheet" href="style.css" />
+  <div id="toast" class="toast"></div>
 </head>
 <body>
-    <header class="header">
-        <nav class="nav">
-            <div class="logo">
-                <div class="logo-icon">⚙️</div>
-                <span>ParkingPro - Gestión de Tarifas</span>
-            </div>
-            <div class="nav-user">
-                <span id="userName">Cargando...</span>
-                <div>
-                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/dashboard'">📊 Dashboard</button>
-                    <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
-                </div>
-            </div>
-        </nav>
-    </header>
+  <nav class="topbar">
+    <strong>🚘 ParqueoApp</strong>
+    <span id="currentUser"></span>
+    <div class="spacer"></div>
 
-    <main class="container">
-        <div class="dashboard">
-            <!-- Gestión de Tarifas -->
-            <div class="card fade-in">
-                <div class="card-header">
-                    <h2 class="card-title">Configuración de Tarifas</h2>
-                    <button class="btn btn-secondary btn-sm" onclick="cargarTarifas()">
-                        🔄 Actualizar
-                    </button>
-                </div>
-                
-                <div id="alertMessage" class="hidden"></div>
-                
-                <div class="admin-warning" id="adminWarning" style="display: none;">
-                    <div class="alert alert-warning">
-                        ⚠️ Solo los administradores pueden modificar las tarifas
-                    </div>
-                </div>
-                
-                <div id="listaTarifas">
-                    <div class="text-center">Cargando tarifas...</div>
-                </div>
-            </div>
+    <button id="menuToggle" class="menu-toggle">☰</button>
+    <div id="navLinks" class="links">
+      <a href="dashboard.html">🏠 Dashboard</a>
+      <a href="ingresos.html">➕ Entradas</a>
+      <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
+      <button onclick="AuthUI.logout()">Salir</button>
+    </div>
+  </nav>
 
-            <!-- Información de Tarifas -->
-            <div class="card fade-in">
-                <div class="card-header">
-                    <h2 class="card-title">Sistema de Cobro</h2>
-                </div>
-                
-                <div class="info-grid">
-                    <div class="info-item">
-                        <h4>🚗 Autos</h4>
-                        <ul>
-                            <li><strong>Menos de 30 min:</strong> 5.00 Bs</li>
-                            <li><strong>Primera hora:</strong> 7.00 Bs</li>
-                            <li><strong>Hora extra:</strong> 1.00 Bs</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-item">
-                        <h4>🏍️ Motos</h4>
-                        <ul>
-                            <li><strong>Menos de 30 min:</strong> 4.00 Bs</li>
-                            <li><strong>Primera hora:</strong> 5.00 Bs</li>
-                            <li><strong>Hora extra:</strong> 1.00 Bs</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <h4>📊 Ejemplo de Cálculo</h4>
-                    <div class="ejemplo-cobro">
-                        <p><strong>Vehículo:</strong> Auto - Tiempo: 3 horas 15 minutos</p>
-                        <p><strong>Cálculo:</strong> Primera hora (7 Bs) + 3 horas extra (3 Bs) = <strong>10 Bs</strong></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+  <main class="container">
+    <section class="card">
+      <h2>💲 Tarifas</h2>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle" id="tablaTarifas">
+          <thead>
+            <tr><th>Tipo</th><th>Primera hora</th><th>Hora extra</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="text-muted mt-2">Solo <strong>Admin</strong> puede actualizar si tu RLS lo exige.</p>
+    </section>
+  </main>
 
-    <script src="auth.js"></script>
-    <script>
-        async function cargarTarifas() {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/tarifas', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (!res.ok) throw new Error('Error al cargar tarifas');
-                
-                const tarifas = await res.json();
-                const user = JSON.parse(localStorage.getItem('user') || '{}');
-                const isAdmin = user.rol === 'admin';
-                
-                // Mostrar/ocultar advertencia para no administradores
-                document.getElementById('adminWarning').style.display = isAdmin ? 'none' : 'block';
-                
-                document.getElementById('listaTarifas').innerHTML = tarifas.map(tarifa => `
-                    <div class="tarifa-item">
-                        <div class="tarifa-header">
-                            <h3 style="text-transform: capitalize; margin: 0;">${tarifa.tipo_vehiculo}</h3>
-                            <span class="badge ${tarifa.tipo_vehiculo === 'auto' ? 'badge-success' : 'badge-warning'}">
-                                ${tarifa.tipo_vehiculo}
-                            </span>
-                        </div>
-                        
-                        <div class="tarifa-form">
-                            <div class="input-group">
-                                <label>Primera Hora (Bs)</label>
-                                <input 
-                                    type="number" 
-                                    id="p1_${tarifa.id}" 
-                                    class="form-input" 
-                                    value="${tarifa.precio_primera_hora}" 
-                                    step="0.01"
-                                    min="0"
-                                    ${isAdmin ? '' : 'disabled'}
-                                >
-                            </div>
-                            
-                            <div class="input-group">
-                                <label>Hora Extra (Bs)</label>
-                                <input 
-                                    type="number" 
-                                    id="p2_${tarifa.id}" 
-                                    class="form-input" 
-                                    value="${tarifa.precio_hora_extra}" 
-                                    step="0.01"
-                                    min="0"
-                                    ${isAdmin ? '' : 'disabled'}
-                                >
-                            </div>
-                        </div>
-                        
-                        ${isAdmin ? `
-                            <button 
-                                class="btn btn-primary" 
-                                onclick="guardarTarifa('${tarifa.id}')"
-                                style="width: 100%; margin-top: 1rem;"
-                            >
-                                💾 Guardar Cambios
-                            </button>
-                        ` : `
-                            <div class="alert alert-warning" style="margin-top: 1rem;">
-                                Solo administradores pueden modificar tarifas
-                            </div>
-                        `}
-                    </div>
-                `).join('');
-                
-            } catch (error) {
-                mostrarAlerta('Error al cargar tarifas: ' + error.message, 'error');
-            }
-        }
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async () => {
+      await AuthUI.requireAuth();
+      if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
 
-        async function guardarTarifa(id) {
-            try {
-                const p1 = parseFloat(document.getElementById('p1_' + id).value);
-                const p2 = parseFloat(document.getElementById('p2_' + id).value);
-                
-                if (isNaN(p1) || isNaN(p2) || p1 < 0 || p2 < 0) {
-                    throw new Error('Los precios deben ser números válidos y mayores o iguales a 0');
-                }
-
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/tarifas/' + id, {
-                    method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        precio_primera_hora: p1,
-                        precio_hora_extra: p2
-                    })
-                });
-
-                const data = await res.json();
-                
-                if (data.success) {
-                    mostrarAlerta('✅ Tarifa actualizada correctamente');
-                } else {
-                    throw new Error(data.error || 'Error al actualizar');
-                }
-            } catch (error) {
-                mostrarAlerta('❌ Error: ' + error.message, 'error');
-            }
-        }
-
-        function mostrarAlerta(mensaje, tipo = 'success') {
-            const container = document.getElementById('alertMessage');
-            container.className = `alert alert-${tipo}`;
-            container.textContent = mensaje;
-            container.classList.remove('hidden');
-            
-            setTimeout(() => {
-                container.classList.add('hidden');
-            }, 5000);
-        }
-
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/';
-        }
-
-        // Inicialización
-        document.addEventListener('DOMContentLoaded', function() {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            document.getElementById('userName').textContent = `${user.nombre} (${user.rol})`;
-            
-            cargarTarifas();
-        });
-    </script>
+      async function render(){
+        try{
+          const data = await ParkingAPI.listarTarifas();
+          const tb = document.querySelector('#tablaTarifas tbody');
+          tb.innerHTML = '';
+          data.forEach(row=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${row.tipo_vehiculo === 'moto' ? '🛵 Moto' : '🚗 Auto'}</td>
+              <td><input type="number" step="0.01" class="form-control" value="${row.precio_primera_hora}"></td>
+              <td><input type="number" step="0.01" class="form-control" value="${row.precio_hora_extra}"></td>
+              <td class="text-end"><button class="btn btn-primary btn-sm">💾 Guardar</button></td>
+            `;
+            tr.querySelector('button').addEventListener('click', async ()=>{
+              const primera = tr.children[1].querySelector('input').value;
+              const extra   = tr.children[2].querySelector('input').value;
+              try{ await ParkingAPI.actualizarTarifa(row.tipo_vehiculo, primera, extra); toast('Tarifa actualizada'); }
+              catch(e){ toast(e.message||String(e), false); }
+            });
+            tb.appendChild(tr);
+          });
+        }catch(e){ toast(e.message||String(e), false); }
+      }
+      render();
+    })();
+  </script>
 </body>
 </html>

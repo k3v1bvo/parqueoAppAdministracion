@@ -1,254 +1,176 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ingresos Extra - ParkingPro</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Entradas / Salidas</title>
+  <link rel="stylesheet" href="style.css" />
+  <div id="toast" class="toast"></div>
 </head>
 <body>
-    <header class="header">
-        <nav class="nav">
-            <div class="logo">
-                <div class="logo-icon">💰</div>
-                <span>ParkingPro - Ingresos Extra</span>
-            </div>
-            <div class="nav-user">
-                <span id="userName">Cargando...</span>
-                <div>
-                    <button class="btn btn-secondary btn-sm" onclick="window.location.href='/dashboard'">📊 Dashboard</button>
-                    <button class="btn btn-secondary btn-sm" onclick="logout()">🚪 Salir</button>
-                </div>
-            </div>
-        </nav>
-    </header>
+  <nav class="topbar">
+    <strong>🚘 ParqueoApp</strong>
+    <span id="currentUser"></span>
+    <div class="spacer"></div>
+    <div class="nav-links">
+      <a href="dashboard.html">🏠 Dashboard</a>
+      <a href="tarifas.html">💲 Tarifas</a>
+      <a href="extras.html">➕ Ingresos extra</a>
+      <button onclick="AuthUI.logout()">Salir</button>
+    </div>
+    <button class="menu-toggle" id="menuToggle">☰</button>
+  </nav>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="tarifas.html">💲 Tarifas</a>
+    <a href="extras.html">➕ Ingresos extra</a>
+    <button onclick="AuthUI.logout()">Salir</button>
+  </div>
 
-    <main class="container">
-        <div class="dashboard">
-            <!-- Formulario de Ingreso Extra -->
-            <div class="card fade-in">
-                <div class="card-header">
-                    <h2 class="card-title">Registrar Ingreso Extra</h2>
-                </div>
-                
-                <div id="alertMessage" class="hidden"></div>
-                
-                <form id="ingresoForm">
-                    <div class="form-group">
-                        <label class="form-label" for="concepto">Concepto *</label>
-                        <input 
-                            type="text" 
-                            id="concepto" 
-                            class="form-input" 
-                            placeholder="Ej: Lavado de auto, Venta de agua, etc."
-                            required
-                        >
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="monto">Monto (Bs) *</label>
-                        <input 
-                            type="number" 
-                            id="monto" 
-                            class="form-input" 
-                            placeholder="0.00"
-                            step="0.01"
-                            min="0"
-                            required
-                        >
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="descripcion">Descripción Detallada *</label>
-                        <textarea 
-                            id="descripcion" 
-                            class="form-input" 
-                            placeholder="Describe detalladamente el origen de este ingreso..."
-                            rows="3"
-                            required
-                        ></textarea>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-success" style="width: 100%;">
-                        <span>💰 Registrar Ingreso</span>
-                    </button>
-                </form>
+  <main class="container">
+    <div class="row g-3">
+      <section class="col-12 col-md-6">
+        <div class="card">
+          <h2>➕ Abrir ticket (Entrada)</h2>
+          <form id="formEntrada" class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Placa</label>
+              <input name="placa" class="form-control" placeholder="Ej: ABC 123" required />
             </div>
-
-            <!-- Lista de Ingresos Recientes -->
-            <div class="card fade-in">
-                <div class="card-header">
-                    <h2 class="card-title">Ingresos Extra Registrados Hoy</h2>
-                    <button class="btn btn-secondary btn-sm" onclick="cargarIngresos()">
-                        🔄 Actualizar
-                    </button>
-                </div>
-                
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Concepto</th>
-                                <th>Descripción</th>
-                                <th>Monto</th>
-                                <th>Registrado por</th>
-                                <th>Hora</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaIngresos">
-                            <tr>
-                                <td colspan="5" class="text-center">Cargando...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="card-footer">
-                    <div class="resumen-total">
-                        <strong>Total Hoy: </strong>
-                        <span id="totalHoy" class="badge badge-success">0.00 Bs</span>
-                    </div>
-                </div>
+            <div class="col-12">
+              <label class="form-label">Tipo de vehículo</label>
+              <select name="tipoVehiculo" class="form-select">
+                <option value="auto">Auto</option>
+                <option value="moto">Moto</option>
+              </select>
             </div>
+            <div class="col-12 d-grid">
+              <button type="submit" class="btn btn-primary">Abrir ticket</button>
+            </div>
+          </form>
+          <p id="infoEntrada" class="text-muted mt-2"></p>
         </div>
-    </main>
+      </section>
 
-    <script src="auth.js"></script>
-    <script>
-        async function registrarIngreso(event) {
-            event.preventDefault();
-            
-            const concepto = document.getElementById('concepto').value.trim();
-            const monto = parseFloat(document.getElementById('monto').value);
-            const descripcion = document.getElementById('descripcion').value.trim();
+      <section class="col-12 col-md-6">
+        <div class="card">
+          <h2>✔️ Cerrar ticket (Salida)</h2>
+          <form id="formSalida" class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Placa</label>
+              <input name="placa" class="form-control" placeholder="Ej: abc 123" required />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Tipo de pago</label>
+              <div class="d-flex gap-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="tipoPago" id="pagoEfe" value="efectivo" checked>
+                  <label class="form-check-label" for="pagoEfe">🪙 Efectivo</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="tipoPago" id="pagoQR" value="qr">
+                  <label class="form-check-label" for="pagoQR">📱 QR</label>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 d-grid">
+              <button type="submit" class="btn btn-primary">Cerrar ticket</button>
+            </div>
+          </form>
+          <p id="infoSalida" class="text-muted mt-2"></p>
+        </div>
+      </section>
+    </div>
 
-            if (!concepto || isNaN(monto) || monto <= 0 || !descripcion) {
-                mostrarAlerta('❌ Todos los campos son requeridos', 'error');
-                return;
-            }
+    <section class="card">
+      <h2>⌛ Tickets abiertos</h2>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle">
+          <thead>
+            <tr>
+              <th>Placa</th><th>Tipo</th><th>Entrada</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyAbiertos"></tbody>
+        </table>
+      </div>
+      <p class="text-muted">Tip: las placas se normalizan (sin espacios y en MAYÚSCULAS) al guardar y al buscar.</p>
+    </section>
+  </main>
 
-            const button = event.target.querySelector('button');
-            const originalText = button.innerHTML;
-            button.innerHTML = '⏳ Registrando...';
-            button.disabled = true;
+  <script>
+    const menuToggle=document.getElementById('menuToggle');
+    const mobileMenu=document.getElementById('mobileMenu');
+    menuToggle?.addEventListener('click',()=>document.body.classList.toggle('mobile-open'));
+    mobileMenu?.addEventListener('click',()=>document.body.classList.remove('mobile-open'));
+  </script>
 
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch('/api/ingresos', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        concepto,
-                        monto,
-                        descripcion
-                    })
-                });
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async () => {
+      await AuthUI.requireAuth();
 
-                const data = await res.json();
-                
-                if (data.success) {
-                    mostrarAlerta('✅ Ingreso extra registrado correctamente');
-                    document.getElementById('ingresoForm').reset();
-                    cargarIngresos();
-                } else {
-                    throw new Error(data.error || 'Error desconocido');
-                }
-            } catch (error) {
-                mostrarAlerta('❌ Error: ' + error.message, 'error');
-            } finally {
-                button.innerHTML = originalText;
-                button.disabled = false;
-            }
+      document.querySelectorAll('input[name="placa"]').forEach(inp=>{
+        inp.addEventListener('input', ()=>{ inp.value = inp.value.toUpperCase(); });
+      });
+
+      const infoEntrada = document.getElementById('infoEntrada');
+      const infoSalida  = document.getElementById('infoSalida');
+
+      document.getElementById('formEntrada').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const f = e.target;
+        try{
+          const id = await ParkingAPI.abrirTicket({
+            placa: f.placa.value,
+            tipoVehiculo: f.tipoVehiculo.value
+          });
+          infoEntrada.textContent = '✅ Ticket abierto: ' + id;
+          toast('Ticket abierto');
+          f.reset();
+          renderAbiertos();
+        }catch(err){
+          const msg = err?.message || String(err);
+          infoEntrada.textContent = '❌ ' + msg;
+          toast(msg,false);
         }
+      });
 
-        async function cargarIngresos() {
-            try {
-                const token = localStorage.getItem('token');
-                const hoy = new Date().toISOString().split('T')[0];
-                const res = await fetch(`/api/ingresos?fecha=${hoy}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                
-                if (!res.ok) throw new Error('Error al cargar ingresos');
-                
-                const ingresos = await res.json();
-                const tabla = document.getElementById('tablaIngresos');
-                const totalHoy = document.getElementById('totalHoy');
-                
-                // Calcular total
-                const total = ingresos.reduce((sum, ingreso) => sum + ingreso.costo_total, 0);
-                totalHoy.textContent = total.toFixed(2) + ' Bs';
-                
-                if (ingresos.length === 0) {
-                    tabla.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center">
-                                No hay ingresos extra registrados hoy
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-                
-                tabla.innerHTML = ingresos.map(ingreso => `
-                    <tr>
-                        <td><strong>${ingreso.descripcion?.split(' - ')[0]?.replace('INGRESO EXTRA: ', '') || 'Ingreso extra'}</strong></td>
-                        <td>${ingreso.descripcion?.split(' - ')[1] || 'Sin descripción adicional'}</td>
-                        <td><strong class="text-success">${ingreso.costo_total.toFixed(2)} Bs</strong></td>
-                        <td>${ingreso.usuarios?.nombre || 'N/A'}</td>
-                        <td>${new Date(ingreso.hora_entrada).toLocaleTimeString()}</td>
-                    </tr>
-                `).join('');
-                
-            } catch (error) {
-                const tabla = document.getElementById('tablaIngresos');
-                if (tabla) {
-                    tabla.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center">
-                                ❌ Error al cargar ingresos
-                            </td>
-                        </tr>
-                    `;
-                }
-            }
+      document.getElementById('formSalida').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const f = e.target;
+        try{
+          const pago = f.tipoPago.value || 'efectivo';
+          const { id, costo, tipo_pago } = await ParkingAPI.cerrarTicketPorPlaca(f.placa.value, pago);
+          infoSalida.textContent = `✅ Ticket cerrado: ${id} — Total: ${costo} — Pago: ${tipo_pago}`;
+          toast('Ticket cerrado: '+costo);
+          f.reset();
+          renderAbiertos();
+        }catch(err){
+          const msg = err?.message || String(err);
+          infoSalida.textContent = '❌ ' + msg;
+          toast(msg,false);
         }
+      });
 
-        function mostrarAlerta(mensaje, tipo = 'success') {
-            const container = document.getElementById('alertMessage');
-            container.className = `alert alert-${tipo}`;
-            container.textContent = mensaje;
-            container.classList.remove('hidden');
-            
-            setTimeout(() => {
-                container.classList.add('hidden');
-            }, 5000);
-        }
+      async function renderAbiertos(){
+        try{
+          const rows = (await ParkingAPI.listarUltimosTickets(200)).filter(r => r.estado === 'ingresado');
+          const tb = document.getElementById('tbodyAbiertos');
+          tb.innerHTML = rows.length ? rows.map(r=>`
+            <tr>
+              <td class="mono">${r.placa_vehiculo}</td>
+              <td>${r.tipo_vehiculo === 'moto' ? '🛵 Moto' : '🚗 Auto'}</td>
+              <td>${r.hora_entrada ? new Date(r.hora_entrada).toLocaleString() : '-'}</td>
+              <td><span class="badge badge-open">Abierto ⌛</span></td>
+            </tr>`).join('') : `<tr><td colspan="4" class="text-muted">No hay tickets abiertos</td></tr>`;
+        }catch(e){ console.error(e); }
+      }
 
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/';
-        }
-
-        // Inicialización
-        document.addEventListener('DOMContentLoaded', function() {
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            document.getElementById('userName').textContent = `${user.nombre} (${user.rol})`;
-            
-            const ingresoForm = document.getElementById('ingresoForm');
-            if (ingresoForm) {
-                ingresoForm.addEventListener('submit', registrarIngreso);
-            }
-            
-            cargarIngresos();
-        });
-    </script>
+      renderAbiertos();
+    })();
+  </script>
 </body>
 </html>

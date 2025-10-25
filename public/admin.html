@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin - Reportes</title>
+  <link rel="stylesheet" href="style.css" />
+  <div id="toast" class="toast"></div>
+</head>
+<body>
+  <nav class="topbar">
+    <strong>🛡️ Admin</strong>
+    <span id="currentUser"></span>
+    <div class="spacer"></div>
+
+    <button id="menuToggle" class="menu-toggle">☰</button>
+    <div id="navLinks" class="links">
+      <a href="dashboard.html">🏠 Dashboard</a>
+      <a href="ingresos.html">➕ Entradas</a>
+      <a href="tarifas.html">💲 Tarifas</a>
+      <button onclick="AuthUI.logout()">Salir</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <section class="card">
+      <h2>📈 Resumen por periodo</h2>
+
+      <!-- Filtros -->
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Periodo</label>
+          <select id="periodo" class="form-select">
+            <option value="custom">Personalizado</option>
+            <option value="daily">Diario</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly" selected>Mensual</option>
+            <option value="yearly">Anual</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Desde</label>
+          <input id="fechaInicio" type="date" class="form-control">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Hasta</label>
+          <input id="fechaFin" type="date" class="form-control">
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Empleado</label>
+          <select id="empleado" class="form-select">
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3 flex-wrap">
+        <button id="btnAplicar" class="btn btn-primary flex-grow-1">🔍 Aplicar</button>
+        <button id="btnCSV" class="btn btn-secondary">⬇️ CSV</button>
+        <button id="btnPDF" class="btn btn-secondary">🧾 PDF</button>
+      </div>
+
+      <!-- KPIs -->
+      <div class="row g-3 mt-3">
+        <div class="col-12 col-md-4">
+          <div class="stat">
+            <div class="icon icon--cash">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="20" height="10" rx="2"></rect><circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </div>
+            <div>
+              <div class="value mono" id="totalPeriodo">0</div>
+              <div class="label">Total recaudado</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4">
+          <div class="stat">
+            <div class="icon icon--today">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <div>
+              <div class="value" id="ticketsCerrados">0</div>
+              <div class="label">Tickets pagados</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4">
+          <div class="stat">
+            <div class="icon icon--time">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div class="value" id="abiertosPeriodo">0</div>
+              <div class="label">Aún abiertos</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card mt-3" style="padding:1rem;">
+        <canvas id="chartPeriodo" height="110"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>👥 Totales por empleado</h2>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle">
+          <thead><tr><th>Empleado</th><th>Email</th><th class="text-end">Recaudado</th></tr></thead>
+          <tbody id="tbodyEmpleados"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Libs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+
+  <script>
+    let chart;
+
+    async function cargarEmpleados() {
+      const lista = await ParkingAPI.listarUsuariosBasic();
+      const sel = document.getElementById('empleado');
+      sel.innerHTML = '<option value="">Todos</option>' + lista.map(u =>
+        `<option value="${u.id}">${u.nombre || '(sin nombre)'} — ${u.email}</option>`
+      ).join('');
+    }
+
+    function setPeriodoFechas(periodo) {
+      if (periodo !== 'custom') {
+        const r = ParkingAPI.rango(periodo);
+        const d1 = new Date(r.startISO), d2 = new Date(r.endISO);
+        document.getElementById('fechaInicio').value = d1.toISOString().slice(0,10);
+        document.getElementById('fechaFin').value   = d2.toISOString().slice(0,10);
+      }
+    }
+
+    async function renderAdmin({startISO, endISO, emp}) {
+      const res = await ParkingAPI.adminResumenRango(startISO, endISO, emp || "");
+
+      // KPIs
+      document.getElementById('totalPeriodo').textContent    = Number(res.total).toFixed(2);
+      document.getElementById('ticketsCerrados').textContent = res.cerrados;
+      document.getElementById('abiertosPeriodo').textContent = res.abiertos;
+
+      // Series por día
+      const labels = Array.from(res.porDia.keys()).sort();
+      const values = labels.map(k => Number(res.porDia.get(k)||0).toFixed(2));
+
+      const ctx = document.getElementById('chartPeriodo');
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [{ label:'Recaudado', data: values, tension:.3 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } },
+            y: { ticks:{ color:'#9aa3ad' }, grid:{ color:'#222' } }
+          },
+          plugins:{ legend:{ labels:{ color:'#f0f6fc' } } }
+        }
+      });
+
+      // Tabla por empleado
+      const usuarios = await ParkingAPI.listarUsuariosBasic();
+      const map = new Map(usuarios.map(u=>[u.id,u]));
+      const rows = Array.from(res.porEmpleado.entries())
+        .sort((a,b)=>b[1]-a[1])
+        .map(([id,total])=>{
+          const u = map.get(id) || {nombre:'(sin nombre)', email:''};
+          return `<tr><td>${u.nombre}</td><td>${u.email}</td><td class="mono text-end">${Number(total).toFixed(2)}</td></tr>`;
+        }).join('');
+      document.getElementById('tbodyEmpleados').innerHTML = rows || `<tr><td colspan="3" class="text-muted">Sin datos</td></tr>`;
+    }
+
+    // Exportar CSV (tabla empleados)
+    function exportCSV() {
+      const rows = [...document.querySelectorAll('#tbodyEmpleados tr')];
+      let csv = "Empleado,Email,Recaudado\n";
+      rows.forEach(r=>{
+        const cols = [...r.querySelectorAll('td')].map(td=>td.innerText.replace(/,/g,''));
+        if(cols.length) csv += cols.join(",") + "\n";
+      });
+      const blob = new Blob([csv], {type:"text/csv"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = "reporte_admin.csv"; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Exportar PDF (chart + KPIs)
+    async function exportPDF() {
+      const pdf = new jspdf.jsPDF({orientation:"p",unit:"pt",format:"a4"});
+      pdf.text("Reporte de Parqueo", 40, 40);
+      const kpis = `Total: ${document.getElementById('totalPeriodo').innerText} | Pagados: ${document.getElementById('ticketsCerrados').innerText} | Abiertos: ${document.getElementById('abiertosPeriodo').innerText}`;
+      pdf.text(kpis, 40, 60);
+
+      const chartCanvas = document.getElementById('chartPeriodo');
+      const canvas = await html2canvas(chartCanvas.parentElement); // captura el contenedor del gráfico
+      const img = canvas.toDataURL("image/png");
+      const w = 520, h = (canvas.height * w) / canvas.width;
+      pdf.addImage(img, "PNG", 40, 80, w, h);
+
+      pdf.save("reporte_parqueo.pdf");
+    }
+
+    (async ()=>{
+      await AuthUI.requireAdmin();
+
+      // Cargar lista empleados
+      await cargarEmpleados();
+
+      // Set de fechas iniciales (mensual por defecto)
+      setPeriodoFechas('monthly');
+
+      // Eventos
+      document.getElementById('periodo').addEventListener('change', (e)=>{
+        setPeriodoFechas(e.target.value);
+      });
+      document.getElementById('btnAplicar').addEventListener('click', async ()=>{
+        const periodo = document.getElementById('periodo').value;
+        let startISO, endISO;
+        if (periodo === 'custom') {
+          const fi = document.getElementById('fechaInicio').value;
+          const ff = document.getElementById('fechaFin').value;
+          if(!fi || !ff) { toast("Selecciona fechas inicio y fin.", false); return; }
+          startISO = new Date(fi+"T00:00:00").toISOString();
+          endISO   = new Date(ff+"T23:59:59").toISOString();
+        } else {
+          const r = ParkingAPI.rango(periodo); startISO = r.startISO; endISO = r.endISO;
+        }
+        const emp = document.getElementById('empleado').value;
+        await renderAdmin({startISO, endISO, emp});
+      });
+
+      document.getElementById('btnCSV').addEventListener('click', exportCSV);
+      document.getElementById('btnPDF').addEventListener('click', exportPDF);
+
+      // Primera render mensual
+      const r0 = ParkingAPI.rango('monthly');
+      await renderAdmin({startISO:r0.startISO, endISO:r0.endISO, emp:""});
+    })();
+  </script>
+</body>
+</html>

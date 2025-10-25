@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ingresos extra</title>
+  <link rel="stylesheet" href="style.css" />
+  <div id="toast" class="toast"></div>
+</head>
+<body>
+  <nav class="topbar">
+    <strong>➕ Ingresos extra</strong>
+    <span id="currentUser"></span>
+    <div class="spacer"></div>
+    <div class="nav-links">
+      <a href="dashboard.html">🏠 Dashboard</a>
+      <a href="ingresos.html">🚗 Entradas/Salidas</a>
+      <a href="tarifas.html">💲 Tarifas</a>
+      <button onclick="AuthUI.logout()">Salir</button>
+    </div>
+    <button class="menu-toggle" id="menuToggle">☰</button>
+  </nav>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="dashboard.html">🏠 Dashboard</a>
+    <a href="ingresos.html">🚗 Entradas/Salidas</a>
+    <a href="tarifas.html">💲 Tarifas</a>
+    <button onclick="AuthUI.logout()">Salir</button>
+  </div>
+
+  <main class="container">
+    <section class="card">
+      <h2>🧾 Registrar ingreso extra</h2>
+      <form id="formExtra" class="row g-3">
+        <div class="col-12 col-md-8">
+          <label class="form-label">Concepto</label>
+          <input name="concepto" class="form-control" placeholder="Baño, Lavado, etc." required />
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Monto</label>
+          <input name="monto" type="number" step="0.01" class="form-control" placeholder="0.00" required />
+        </div>
+        <div class="col-12 d-grid">
+          <button class="btn btn-primary" type="submit">Guardar</button>
+        </div>
+      </form>
+      <p id="infoExtra" class="text-muted mt-2"></p>
+    </section>
+
+    <section class="card">
+      <h2>📅 Hoy</h2>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle">
+          <thead>
+            <tr><th>Hora</th><th>Concepto</th><th>Monto</th></tr>
+          </thead>
+          <tbody id="tbodyExtras"></tbody>
+        </table>
+      </div>
+      <p class="mt-2"><span class="chip">Total día: <span id="totalDia" class="mono"></span></span></p>
+    </section>
+  </main>
+
+  <script>
+    const menuToggle=document.getElementById('menuToggle');
+    const mobileMenu=document.getElementById('mobileMenu');
+    menuToggle?.addEventListener('click',()=>document.body.classList.toggle('mobile-open'));
+    mobileMenu?.addEventListener('click',()=>document.body.classList.remove('mobile-open'));
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async () => {
+      await AuthUI.requireAuth();
+
+      const form = document.getElementById('formExtra');
+      const info = document.getElementById('infoExtra');
+
+      form.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const concepto = form.concepto.value.trim();
+        const monto = form.monto.value;
+        try{
+          await ParkingAPI.agregarIngresoExtra({ concepto, monto });
+          toast('Ingreso registrado');
+          form.reset();
+          renderHoy();
+        }catch(err){
+          const msg = err?.message || String(err);
+          info.textContent = '❌ ' + msg;
+          toast(msg, false);
+        }
+      });
+
+      async function renderHoy(){
+        const rows = await ParkingAPI.listarIngresosExtra();
+        const tb = document.getElementById('tbodyExtras');
+        if (!rows.length){
+          tb.innerHTML = `<tr><td colspan="3" class="text-muted">Sin registros hoy</td></tr>`;
+          document.getElementById('totalDia').textContent = '0.00';
+          return;
+        }
+        let total = 0;
+        tb.innerHTML = rows.map(x=>{
+          total += Number(x.monto||0);
+          const hora = new Date(x.creado_at).toLocaleTimeString();
+          return `<tr><td>${hora}</td><td>${x.concepto}</td><td class="mono">💵 ${Number(x.monto).toFixed(2)}</td></tr>`
+        }).join('');
+        document.getElementById('totalDia').textContent = Number(total).toFixed(2);
+      }
+
+      renderHoy();
+    })();
+  </script>
+</body>
+</html>
