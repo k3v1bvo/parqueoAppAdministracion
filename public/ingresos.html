@@ -8,15 +8,14 @@
   <div id="toast" class="toast"></div>
 </head>
 <body>
-  <!-- ÚNICO NAVBAR -->
   <nav class="topbar">
     <strong>🚘 ParqueoApp</strong>
     <span id="currentUser"></span>
     <div class="spacer"></div>
-
     <button id="menuToggle" class="menu-toggle">☰</button>
     <div id="navLinks" class="links">
       <a href="dashboard.html">🏠 Dashboard</a>
+      <a href="planes.html">📅 Planes</a>
       <a href="tarifas.html">💲 Tarifas</a>
       <a href="extras.html">🧾 Ingresos extra</a>
       <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
@@ -33,6 +32,7 @@
 
           <label class="form-label">Placa</label>
           <input id="inPlaca" class="form-control" placeholder="Ej: ABC 123" />
+          <div id="inPlanInfo" class="chip mt-1" style="display:none"></div>
 
           <label class="form-label mt-2">Tipo de vehículo</label>
           <select id="inTipo" class="form-select">
@@ -52,6 +52,7 @@
 
           <label class="form-label">Placa</label>
           <input id="outPlaca" class="form-control" placeholder="Ej: abc 123" />
+          <div id="outPlanInfo" class="chip mt-1" style="display:none"></div>
 
           <label class="form-label mt-2">Tipo de pago</label>
           <div class="radio-group">
@@ -64,7 +65,6 @@
       </section>
     </div>
 
-    <!-- Abiertos -->
     <section class="card mt-4">
       <h2>⏳ Tickets abiertos</h2>
       <div class="table-wrap">
@@ -79,46 +79,62 @@
     </section>
   </main>
 
-  <!-- Libs -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="auth.js"></script>
-
   <script>
-    // OJO: no declaramos 'const supa' aquí. Usamos el que ya define auth.js
-
     const ICON = (t) => t==='moto' ? '🛵 Moto' : (t==='bicicleta' ? '🚲 Bicicleta' : '🚗 Auto');
 
     (async ()=>{
       await AuthUI.requireAuth();
       if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
 
-      // abrir
+      const inPlaca = document.getElementById('inPlaca');
+      const outPlaca = document.getElementById('outPlaca');
+      const inInfo = document.getElementById('inPlanInfo');
+      const outInfo = document.getElementById('outPlanInfo');
+
+      async function showPlan(elInput, elChip){
+        const placa = elInput.value;
+        if(!placa){ elChip.style.display='none'; elChip.textContent=''; return; }
+        try{
+          const plan = await ParkingAPI.planActivoPorPlaca(placa);
+          if(plan){
+            elChip.textContent = `📅 Plan activo: ${plan.nombre} (${plan.tipo}${plan.tipo==='mensual'?'':' · '+Number(plan.precio).toFixed(2)+' Bs'})`;
+            elChip.style.display='inline-flex';
+          }else{
+            elChip.textContent = 'Sin plan activo';
+            elChip.style.display='inline-flex';
+          }
+        }catch(e){ console.warn(e); elChip.style.display='none'; }
+      }
+
+      inPlaca.addEventListener('input', ()=> showPlan(inPlaca, inInfo));
+      outPlaca.addEventListener('input', ()=> showPlan(outPlaca, outInfo));
+
       document.getElementById('btnAbrir').addEventListener('click', async ()=>{
-        const placa = document.getElementById('inPlaca').value;
+        const placa = inPlaca.value;
         const tipo  = document.getElementById('inTipo').value;
         try{
           await ParkingAPI.abrirTicket({ placa, tipoVehiculo: tipo });
           toast('Ticket abierto');
-          document.getElementById('inPlaca').value='';
+          inPlaca.value=''; inInfo.style.display='none';
           await cargarAbiertos();
         }catch(e){ toast(e.message||String(e), false); }
       });
 
-      // cerrar
       document.getElementById('btnCerrar').addEventListener('click', async ()=>{
-        const placa = document.getElementById('outPlaca').value;
+        const placa = outPlaca.value;
         const forma = document.querySelector('input[name="pay"]:checked').value;
         try{
           const res = await ParkingAPI.cerrarTicketPorPlaca(placa, forma);
-          toast(`Ticket cerrado: ${res.formaPago} Bs ${res.costo.toFixed(2)}`);
-          document.getElementById('outPlaca').value='';
+          toast(res.plan ? `Cerrado con plan (${res.plan}) · Bs ${res.costo.toFixed(2)}` : `Cerrado · Bs ${res.costo.toFixed(2)}`);
+          outPlaca.value=''; outInfo.style.display='none';
           await cargarAbiertos();
         }catch(e){ toast(e.message||String(e), false); }
       });
 
       async function cargarAbiertos(){
-        // usamos 'supa' global (definido en auth.js)
         const rows = await supa
           .from('tickets')
           .select('placa_vehiculo,tipo_vehiculo,hora_entrada,estado')
@@ -140,10 +156,8 @@
         `).join('') || `<tr><td colspan="4" class="text-muted">No hay tickets abiertos</td></tr>`;
       }
 
-      // primera carga
       await cargarAbiertos();
 
-      // toggle móvil
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
