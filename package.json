@@ -1,7 +1,9 @@
 {
-  "name": "parqueo_web",
+  "name": "parqueoapp",
   "version": "1.0.0",
-  "private": true,
+  "description": "Aplicación de administración de parqueo (Supabase + frontend estático)",
+  "type": "module",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },

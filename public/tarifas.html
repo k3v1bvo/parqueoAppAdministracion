@@ -3,37 +3,69 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tarifas</title>
+  <title>Tarifas - Parqueo</title>
   <link rel="stylesheet" href="style.css" />
   <div id="toast" class="toast"></div>
 </head>
 <body>
   <nav class="topbar">
-    <strong>🚘 ParqueoApp</strong>
+    <strong>💲 Tarifas</strong>
     <span id="currentUser"></span>
     <div class="spacer"></div>
 
     <button id="menuToggle" class="menu-toggle">☰</button>
     <div id="navLinks" class="links">
       <a href="dashboard.html">🏠 Dashboard</a>
-      <a href="ingresos.html">➕ Entradas</a>
+      <a href="ingresos.html">➕ Tickets</a>
+      <a href="extras.html">🧾 Ingresos extra</a>
       <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
   </nav>
 
   <main class="container">
-    <section class="card">
-      <h2>💲 Tarifas</h2>
+    <section class="card" style="max-width:880px;margin-inline:auto">
+      <h2>💵 Tarifas</h2>
+
       <div class="table-wrap">
-        <table class="table table-dark table-borderless align-middle" id="tablaTarifas">
+        <table class="table table-dark table-borderless align-middle">
           <thead>
-            <tr><th>Tipo</th><th>Primera hora</th><th>Hora extra</th><th></th></tr>
+            <tr>
+              <th>Tipo</th>
+              <th>Primera hora (Bs)</th>
+              <th>Hora extra (Bs)</th>
+              <th class="text-end">Acciones</th>
+            </tr>
           </thead>
-          <tbody></tbody>
+          <tbody id="tbodyTarifas"></tbody>
         </table>
       </div>
+
       <p class="text-muted mt-2">Solo <strong>Admin</strong> puede actualizar si tu RLS lo exige.</p>
+
+      <hr class="mt-3" style="border-color:#1f2937"/>
+
+      <!-- Agregar tipo faltante -->
+      <div class="row g-3 mt-2">
+        <div class="col-12 col-lg-3">
+          <label class="form-label">Nuevo tipo</label>
+          <select id="newTipo" class="form-select">
+            <option value="">— Seleccionar —</option>
+          </select>
+        </div>
+        <div class="col-6 col-lg-3">
+          <label class="form-label">Primera hora</label>
+          <input id="newPrimera" type="number" step="0.01" class="form-control" placeholder="0.00">
+        </div>
+        <div class="col-6 col-lg-3">
+          <label class="form-label">Hora extra</label>
+          <input id="newExtra" type="number" step="0.01" class="form-control" placeholder="0.00">
+        </div>
+        <div class="col-12 col-lg-3 d-grid">
+          <label class="form-label">&nbsp;</label>
+          <button id="btnAdd" class="btn btn-primary">➕ Agregar tipo</button>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -41,34 +73,86 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
-    (async () => {
+    const ICON = (t) => t==='moto' ? '🛵 Moto' : (t==='bicicleta' ? '🚲 Bicicleta' : '🚗 Auto');
+
+    async function renderTarifas(){
+      const list = await ParkingAPI.listarTarifas();
+      const tb = document.getElementById('tbodyTarifas');
+
+      tb.innerHTML = (list||[]).map(r => {
+        const tipo = r.tipo_vehiculo.toLowerCase();
+        return `
+          <tr data-tipo="${tipo}">
+            <td>${ICON(tipo)}</td>
+            <td><input class="form-control" data-field="primera" type="number" step="0.01" value="${Number(r.precio_primera_hora||0)}"></td>
+            <td><input class="form-control" data-field="extra"   type="number" step="0.01" value="${Number(r.precio_hora_extra||0)}"></td>
+            <td class="text-end">
+              <button class="btn btn-primary" onclick="saveRow('${tipo}')">Guardar</button>
+            </td>
+          </tr>
+        `;
+      }).join('') || `<tr><td colspan="4" class="text-muted">No hay tarifas configuradas.</td></tr>`;
+
+      // preparar selector de "nuevo tipo" con los faltantes
+      const tiposBase = ['auto','moto','bicicleta'];
+      const existentes = new Set((list||[]).map(x => x.tipo_vehiculo.toLowerCase()));
+      const faltan = tiposBase.filter(t => !existentes.has(t));
+      const sel = document.getElementById('newTipo');
+      sel.innerHTML = `<option value="">— Seleccionar —</option>` + faltan.map(t => `<option value="${t}">${ICON(t)}</option>`).join('');
+    }
+
+    async function saveRow(tipo){
+      const tr = document.querySelector(`tr[data-tipo="${tipo}"]`);
+      const primera = tr.querySelector('input[data-field="primera"]').value;
+      const extra   = tr.querySelector('input[data-field="extra"]').value;
+      try{
+        await ParkingAPI.actualizarTarifa(tipo, primera, extra);
+        toast('Tarifa actualizada');
+      }catch(e){
+        toast(e?.message || String(e), false);
+      }
+    }
+
+    document.getElementById('btnAdd').addEventListener('click', async ()=>{
+      const tipo = document.getElementById('newTipo').value;
+      const primera = document.getElementById('newPrimera').value;
+      const extra   = document.getElementById('newExtra').value;
+      if(!tipo || !primera || !extra){ toast('Completa los campos', false); return; }
+
+      // upsert via actualizarTarifa (si no existe, lo creamos con insert manual)
+      try {
+        // Intento: si no existe, hacemos insert
+        const { data, error } = await supabase.from('tarifas').select('tipo_vehiculo').eq('tipo_vehiculo', tipo).maybeSingle();
+        if (error) throw error;
+
+        if (!data) {
+          const ins = await supabase.from('tarifas').insert({
+            tipo_vehiculo: tipo,
+            precio_primera_hora: Number(primera),
+            precio_hora_extra: Number(extra)
+          });
+          if (ins.error) throw ins.error;
+        } else {
+          await ParkingAPI.actualizarTarifa(tipo, primera, extra);
+        }
+        toast('Tipo agregado/actualizado');
+        document.getElementById('newTipo').value='';
+        document.getElementById('newPrimera').value='';
+        document.getElementById('newExtra').value='';
+        await renderTarifas();
+      } catch (e) {
+        toast(e?.message || String(e), false);
+      }
+    });
+
+    (async ()=>{
       await AuthUI.requireAuth();
       if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
+      await renderTarifas();
 
-      async function render(){
-        try{
-          const data = await ParkingAPI.listarTarifas();
-          const tb = document.querySelector('#tablaTarifas tbody');
-          tb.innerHTML = '';
-          data.forEach(row=>{
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${row.tipo_vehiculo === 'moto' ? '🛵 Moto' : '🚗 Auto'}</td>
-              <td><input type="number" step="0.01" class="form-control" value="${row.precio_primera_hora}"></td>
-              <td><input type="number" step="0.01" class="form-control" value="${row.precio_hora_extra}"></td>
-              <td class="text-end"><button class="btn btn-primary btn-sm">💾 Guardar</button></td>
-            `;
-            tr.querySelector('button').addEventListener('click', async ()=>{
-              const primera = tr.children[1].querySelector('input').value;
-              const extra   = tr.children[2].querySelector('input').value;
-              try{ await ParkingAPI.actualizarTarifa(row.tipo_vehiculo, primera, extra); toast('Tarifa actualizada'); }
-              catch(e){ toast(e.message||String(e), false); }
-            });
-            tb.appendChild(tr);
-          });
-        }catch(e){ toast(e.message||String(e), false); }
-      }
-      render();
+      document.getElementById('menuToggle').addEventListener('click', ()=>{
+        document.getElementById('navLinks').classList.toggle('open');
+      });
     })();
   </script>
 </body>

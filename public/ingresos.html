@@ -79,10 +79,16 @@
     </section>
   </main>
 
+  <!-- Libs -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="auth.js"></script>
+
   <script>
+    // OJO: no declaramos 'const supa' aquí. Usamos el que ya define auth.js
+
+    const ICON = (t) => t==='moto' ? '🛵 Moto' : (t==='bicicleta' ? '🚲 Bicicleta' : '🚗 Auto');
+
     (async ()=>{
       await AuthUI.requireAuth();
       if (await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
@@ -112,17 +118,22 @@
       });
 
       async function cargarAbiertos(){
-        const rows = await supabase
+        // usamos 'supa' global (definido en auth.js)
+        const rows = await supa
           .from('tickets')
           .select('placa_vehiculo,tipo_vehiculo,hora_entrada,estado')
           .eq('estado','ingresado')
           .order('hora_entrada',{ascending:false});
+
         const tb = document.getElementById('tbodyAbiertos');
-        if(rows.error){ tb.innerHTML = `<tr><td colspan="4" class="text-muted">Error: ${rows.error.message}</td></tr>`; return; }
+        if(rows.error){
+          tb.innerHTML = `<tr><td colspan="4" class="text-muted">Error: ${rows.error.message}</td></tr>`;
+          return;
+        }
         tb.innerHTML = (rows.data||[]).map(r=>`
           <tr>
             <td class="mono">${r.placa_vehiculo}</td>
-            <td>${r.tipo_vehiculo==='moto'?'🛵 Moto': (r.tipo_vehiculo==='bicicleta'?'🚲 Bicicleta':'🚗 Auto')}</td>
+            <td>${ICON(r.tipo_vehiculo)}</td>
             <td>${new Date(r.hora_entrada).toLocaleString()}</td>
             <td><span class="badge badge-open">Abierto</span></td>
           </tr>

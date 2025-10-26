@@ -1,18 +1,25 @@
-// Servidor estático para /public (sin backend)
-const express = require('express');
-const path = require('path');
+// server.js - servidor estático para ParqueoApp (listo para Railway)
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Archivos estáticos desde /public (sirve .html por extensión)
+app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
 
-// evita 404 por favicon
-app.get('/favicon.ico', (_req, res) => res.status(204).end());
+// Healthcheck para deploy
+app.get("/health", (req, res) => res.json({ ok: true }));
 
-// healthcheck
-app.get('/health', (_req, res) => res.json({ ok: true }));
+// Fallback: si la ruta no existe, lleva a login (puedes cambiar a dashboard si prefieres)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
 
 app.listen(PORT, () => {
-  console.log(`✅ Frontend sirviendo /public en http://localhost:${PORT}/login.html`);
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
