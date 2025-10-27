@@ -1,11 +1,15 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Planes / Suscripciones - Parqueo</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planes · ParqueoApp</title>
+  <link rel="stylesheet" href="style.css" />
   <div id="toast" class="toast"></div>
+  <style>
+    .card{background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:16px}
+    .table-wrap{overflow:auto}
+  </style>
 </head>
 <body>
   <nav class="topbar">
@@ -17,50 +21,61 @@
       <a href="dashboard.html">🏠 Dashboard</a>
       <a href="ingresos.html">🚘 Tickets</a>
       <a href="tarifas.html">💲 Tarifas</a>
-      <a href="extras.html">🧾 Ingresos extra</a>
-      <a href="admin.html" id="linkAdmin" style="display:none;">🛡️ Admin</a>
+      <a href="admin.html">🛡️ Admin</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
   </nav>
 
   <main class="container">
+
     <section class="card">
-      <h2>Planes disponibles</h2>
+      <h2>➕ Registrar plan por placa</h2>
+      <div class="row g-3">
+        <div class="col-12 col-lg-3">
+          <label class="form-label">Placa</label>
+          <input id="plPlaca" class="form-control" placeholder="ABC 123" />
+        </div>
+        <div class="col-12 col-lg-3">
+          <label class="form-label">Tipo vehículo</label>
+          <select id="plTipo" class="form-select">
+            <option value="auto">Auto</option>
+            <option value="moto">Moto</option>
+            <option value="bicicleta">Bicicleta</option>
+          </select>
+        </div>
+        <div class="col-12 col-lg-3">
+          <label class="form-label">Plan</label>
+          <select id="plNombre" class="form-select">
+            <option value="Diario 12">Diario 12 (frecuente)</option>
+            <option value="Diario 15">Diario 15 (normal)</option>
+            <option value="Noche 12">Noche 12</option>
+            <option value="Día+Noche 22">Día+Noche 22</option>
+            <option value="Día+Noche 25">Día+Noche 25</option>
+            <option value="Mensual">Mensual (personalizado)</option>
+          </select>
+        </div>
+        <div class="col-12 col-lg-2">
+          <label class="form-label">Precio (Bs)</label>
+          <input id="plPrecio" type="number" step="0.01" class="form-control" placeholder="0.00" />
+        </div>
+        <div class="col-12 col-lg-1 d-grid">
+          <label class="form-label">&nbsp;</label>
+          <button id="btnPlan" class="btn btn-primary">Guardar</button>
+        </div>
+      </div>
+      <p class="hint mt-2">Guarda la suscripción del cliente. (Tabla: <code>vehiculos_planes</code>).</p>
+    </section>
+
+    <section class="card mt-3">
+      <h3>📋 Planes registrados</h3>
       <div class="table-wrap">
-        <table class="table table-dark align-middle">
-          <thead><tr><th>Nombre</th><th>Tipo</th><th>Precio (Bs)</th><th>Duración (días)</th><th>Descripción</th></tr></thead>
+        <table class="table table-dark table-borderless align-middle">
+          <thead><tr><th>Placa</th><th>Tipo</th><th>Plan</th><th>Precio</th><th>Fecha</th></tr></thead>
           <tbody id="tbodyPlanes"></tbody>
         </table>
       </div>
     </section>
 
-    <section class="card mt-3">
-      <h3>Asignar plan a vehículo</h3>
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Placa</label>
-          <input id="vehPlaca" class="form-control" placeholder="Ej: ABC123">
-        </div>
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Plan</label>
-          <select id="planSel" class="form-select"></select>
-        </div>
-        <div class="col-12 col-lg-4 d-grid">
-          <label class="form-label">&nbsp;</label>
-          <button id="btnAsignar" class="btn btn-primary">Asignar plan</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="card mt-3">
-      <h3>Vehículos con plan activo</h3>
-      <div class="table-wrap">
-        <table class="table table-dark align-middle">
-          <thead><tr><th>Placa</th><th>Plan</th><th>Inicio</th><th>Fin</th></tr></thead>
-          <tbody id="tbodyActivos"></tbody>
-        </table>
-      </div>
-    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -68,67 +83,58 @@
   <script src="auth.js"></script>
   <script>
     (async ()=>{
-      await AuthUI.requireAuth();
-      if(await ParkingAPI.isAdmin()) document.getElementById('linkAdmin').style.display='inline-flex';
+      await AuthUI.requireAdmin();
 
-      async function cargarPlanes(){
-        const {data,error} = await supa.from('planes').select('*').order('precio',{ascending:true});
-        if(error){toast(error.message,false);return;}
-        document.getElementById('tbodyPlanes').innerHTML =
-          data.map(p=>`<tr><td>${p.nombre}</td><td>${p.tipo}</td><td>${Number(p.precio).toFixed(2)}</td><td>${p.duracion_dias}</td><td>${p.descripcion||''}</td></tr>`).join('');
-        const sel=document.getElementById('planSel');
-        sel.innerHTML=data.map(p=>`<option value="${p.id}">${p.nombre} (${Number(p.precio).toFixed(2)} Bs)</option>`).join('');
-      }
-
-      async function cargarActivos(){
-        const {data,error}=await supa
-          .from('vehiculos_planes')
-          .select('id,fecha_inicio,fecha_fin,vehiculos(placa),planes(nombre)')
-          .eq('activo',true);
-        if(error){toast(error.message,false);return;}
-        document.getElementById('tbodyActivos').innerHTML =
-          (data||[]).map(v=>`
-            <tr>
-              <td>${v.vehiculos?.placa||'-'}</td>
-              <td>${v.planes?.nombre||'-'}</td>
-              <td>${new Date(v.fecha_inicio).toLocaleDateString()}</td>
-              <td>${v.fecha_fin?new Date(v.fecha_fin).toLocaleDateString():'-'}</td>
-            </tr>
-          `).join('') || '<tr><td colspan="4" class="text-muted">Sin planes activos</td></tr>';
-      }
-
-      document.getElementById('btnAsignar').addEventListener('click', async ()=>{
-        const placa=document.getElementById('vehPlaca').value.trim().toUpperCase().replace(/\s+/g,'');
-        const plan=document.getElementById('planSel').value;
-        if(!placa||!plan){toast('Completa los campos',false);return;}
-
-        let {data:veh, error:errV} = await supa.from('vehiculos').select('id').eq('placa',placa).maybeSingle();
-        if(errV){toast(errV.message,false);return;}
-        if(!veh){
-          const ins = await supa.from('vehiculos').insert({placa}).select('id').maybeSingle();
-          if(ins.error){toast(ins.error.message,false);return;}
-          veh = ins.data;
-        }
-
-        const planData=(await supa.from('planes').select('*').eq('id',plan).maybeSingle()).data;
-        const hoy=new Date();
-        const fin=new Date(hoy.getTime()+planData.duracion_dias*24*60*60*1000);
-
-        // upsert: 1 plan activo por placa
-        const up=await supa.from('vehiculos_planes').upsert({
-          vehiculo_id:veh.id, plan_id:plan, fecha_inicio:hoy.toISOString(), fecha_fin:fin.toISOString(), activo:true
-        });
-        if(up.error){toast(up.error.message,false);return;}
-        toast('Plan asignado');
-        await cargarActivos();
-      });
-
-      await cargarPlanes();
-      await cargarActivos();
-
-      document.getElementById('menuToggle').addEventListener('click',()=>{
+      document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
+
+      // Autoprecio sugerido según plan
+      const sel = document.getElementById('plNombre');
+      const inpPrecio = document.getElementById('plPrecio');
+      const setSugerido = ()=>{
+        const v = sel.value;
+        if(v==='Diario 12') inpPrecio.value = 12;
+        else if(v==='Diario 15') inpPrecio.value = 15;
+        else if(v==='Noche 12') inpPrecio.value = 12;
+        else if(v==='Día+Noche 22') inpPrecio.value = 22;
+        else if(v==='Día+Noche 25') inpPrecio.value = 25;
+      };
+      sel.addEventListener('change', setSugerido); setSugerido();
+
+      document.getElementById('btnPlan').addEventListener('click', async ()=>{
+        const placa = document.getElementById('plPlaca').value.trim();
+        const tipo  = document.getElementById('plTipo').value;
+        const nombrePlan = document.getElementById('plNombre').value;
+        const precio = parseFloat(inpPrecio.value);
+        if(!placa || !precio){ toast('Placa y precio son obligatorios', false); return; }
+        try{
+          await ParkingAPI.crearPlan({ placa, tipoVehiculo:tipo, nombrePlan, precio });
+          toast('Plan guardado');
+          document.getElementById('plPlaca').value='';
+          await cargarPlanes();
+        }catch(e){ toast(e.message||String(e), false); }
+      });
+
+      async function cargarPlanes(){
+        try{
+          const list = await ParkingAPI.listarPlanes();
+          const tb = document.getElementById('tbodyPlanes');
+          tb.innerHTML = (list||[]).map(p=>`
+            <tr>
+              <td class="mono">${p.placa}</td>
+              <td>${p.tipo_vehiculo}</td>
+              <td>${p.plan_nombre}</td>
+              <td class="mono">${Number(p.precio||0).toFixed(2)}</td>
+              <td>${new Date(p.creado_at).toLocaleString()}</td>
+            </tr>
+          `).join('') || `<tr><td colspan="5" class="text-muted">Sin planes</td></tr>`;
+        }catch(e){
+          toast(e.message||String(e), false);
+        }
+      }
+
+      await cargarPlanes();
     })();
   </script>
 </body>

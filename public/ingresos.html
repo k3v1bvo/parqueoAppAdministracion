@@ -1,22 +1,22 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Tickets · Entradas/Salidas</title>
-<link rel="stylesheet" href="style.css" />
-<div id="toast" class="toast"></div>
-<style>
-  .card h2,.card h3{margin:0 0 10px}
-  .badge{padding:.2rem .5rem;border-radius:9999px;font-size:.8rem}
-  .badge-open{background:rgba(250,204,21,.15);border:1px solid rgba(250,204,21,.4);color:#fde68a}
-  .pill{padding:.25rem .6rem;border:1px solid #1f2937;border-radius:9999px;font-size:.8rem;color:#9fb0c5}
-  .input-inline{display:flex;gap:8px;align-items:center}
-  .muted{color:#94a3b8;font-size:.9rem}
-  .btn-danger{background:#ef4444;border:0}
-  .btn-primary{background:#22c55e;border:0}
-  .btn-blue{background:#38bdf8;border:0}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tickets · ParqueoApp</title>
+  <link rel="stylesheet" href="style.css" />
+  <div id="toast" class="toast"></div>
+  <style>
+    .grid-2{display:grid;gap:18px}
+    @media(min-width:992px){.grid-2{grid-template-columns:1fr 1fr}}
+    .card{background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:16px}
+    .mono{font-variant-numeric:tabular-nums}
+    .table-wrap{overflow:auto}
+    .badge{padding:4px 8px;border-radius:8px;background:#065f46}
+    .admin-badge{display:none}
+    body.admin .admin-badge{display:inline-block}
+    datalist option{color:#000}
+  </style>
 </head>
 <body>
   <nav class="topbar">
@@ -26,83 +26,66 @@
     <button id="menuToggle" class="menu-toggle">☰</button>
     <div id="navLinks" class="links">
       <a href="dashboard.html">🏠 Dashboard</a>
-      <a class="active" href="ingresos.html">🚘 Tickets</a>
       <a href="planes.html">📅 Planes</a>
       <a href="tarifas.html">💲 Tarifas</a>
-      <a href="extras.html">🧾 Ingresos extra</a>
+      <a href="admin.html">🛡️ Admin</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
   </nav>
 
   <main class="container">
-    <section class="row g-3">
-      <!-- ENTRADA -->
-      <div class="col-12 col-lg-6">
-        <div class="card">
-          <h2>➕ Abrir ticket (Entrada)</h2>
-          <label class="form-label">Placa</label>
-          <input id="inPlaca" class="form-control" placeholder="Ej: ABC 123" autocomplete="off">
-
-          <div class="row g-3 mt-2">
-            <div class="col-6">
-              <label class="form-label">Tipo de vehículo</label>
-              <select id="inTipo" class="form-select">
-                <option value="auto">Auto</option>
-                <option value="moto">Moto</option>
-                <option value="bicicleta">Bicicleta</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label">Modalidad</label>
-              <select id="inCategoria" class="form-select">
-                <option value="por_hora" selected>Por hora</option>
-                <option value="diario_normal">Diario normal (15)</option>
-                <option value="diario_frecuente">Diario frecuente (12)</option>
-                <option value="noche">Noche (12 hasta 20:00)</option>
-                <option value="dia_y_noche_22">Día + Noche (22)</option>
-                <option value="dia_y_noche_25">Día + Noche (25)</option>
-              </select>
-            </div>
+    <div class="grid-2">
+      <!-- Abrir ticket -->
+      <section class="card">
+        <h2>➕ Abrir ticket (Entrada)</h2>
+        <label class="form-label">Placa</label>
+        <input id="inPlaca" class="form-control" placeholder="Ej: ABC 123" />
+        <div class="row g-3 mt-2">
+          <div class="col-6">
+            <label class="form-label">Tipo de vehículo</label>
+            <select id="inTipo" class="form-select">
+              <option value="auto">Auto</option>
+              <option value="moto">Moto</option>
+              <option value="bicicleta">Bicicleta</option>
+            </select>
           </div>
-
-          <button id="btnAbrir" class="btn btn-primary mt-3">Abrir ticket</button>
-        </div>
-      </div>
-
-      <!-- SALIDA -->
-      <div class="col-12 col-lg-6">
-        <div class="card">
-          <h2>✅ Cerrar ticket (Salida)</h2>
-          <label class="form-label">Placa</label>
-          <input id="outPlaca" class="form-control" placeholder="Escribe para sugerencias…" list="listaPlacas">
-          <datalist id="listaPlacas"></datalist>
-
-          <div class="row g-3 mt-2">
-            <div class="col-6">
-              <label class="form-label">Pago</label>
-              <div class="input-inline">
-                <label class="pill"><input type="radio" name="pago" value="efectivo" checked> Efectivo</label>
-                <label class="pill"><input type="radio" name="pago" value="qr"> QR</label>
-              </div>
-            </div>
-            <div class="col-6">
-              <label class="form-label">Costo estimado</label>
-              <input id="outPreview" class="form-control" readonly value="0.00">
-            </div>
+          <div class="col-6">
+            <label class="form-label">Categoría</label>
+            <select id="inCat" class="form-select">
+              <option value="normal">Cliente normal (día 15)</option>
+              <option value="frecuente">Cliente frecuente (día 12)</option>
+            </select>
           </div>
-
-          <button id="btnCerrar" class="btn btn-blue mt-3">Cerrar ticket</button>
         </div>
-      </div>
-    </section>
+        <button id="btnAbrir" class="btn btn-primary mt-3">Abrir ticket</button>
+        <p class="hint mt-2">Reglas: Día 08:00–19:59 → Normal 15 / Frecuente 12. Noche (20:00–07:59) → 12. Si excede y no cierra → 7 primera hora + 1 extra/h.</p>
+      </section>
 
-    <!-- ABIERTOS -->
+      <!-- Cerrar ticket -->
+      <section class="card">
+        <h2>✅ Cerrar ticket (Salida)</h2>
+        <label class="form-label">Placa (sugerencias de abiertas)</label>
+        <input id="outPlaca" list="opcPlacas" class="form-control" placeholder="Empieza a escribir..." />
+        <datalist id="opcPlacas"></datalist>
+
+        <label class="form-label mt-2">Tipo de pago</label>
+        <div class="row">
+          <div class="col-6"><label><input type="radio" name="pago" value="efectivo" checked /> Efectivo</label></div>
+          <div class="col-6"><label><input type="radio" name="pago" value="qr" /> QR</label></div>
+        </div>
+
+        <button id="btnCerrar" class="btn btn-success mt-3">Cerrar ticket</button>
+        <div id="cerrarMsg" class="mono mt-2"></div>
+      </section>
+    </div>
+
+    <!-- Tickets abiertos (admin puede cerrar manual) -->
     <section class="card mt-3">
-      <h3>⏳ Tickets abiertos</h3>
+      <h3>⏳ Tickets abiertos <span class="admin-badge badge">Admin</span></h3>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
           <thead><tr>
-            <th>Placa</th><th>Tipo</th><th>Modalidad</th><th>Entrada</th><th>Estado</th><th class="text-end">Acción</th>
+            <th>Placa</th><th>Tipo</th><th>Cat.</th><th>Entrada</th><th>Operador</th><th class="text-end">Acción</th>
           </tr></thead>
           <tbody id="tbodyAbiertos"></tbody>
         </table>
@@ -114,107 +97,86 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
-  const precios = { diario_normal:15, diario_frecuente:12, noche:12, dia_y_noche_22:22, dia_y_noche_25:25, p_primera:7, p_extra:1, corte_noche:'20:00' };
-  let abiertos = [];
+    (async ()=>{
+      await AuthUI.requireLogin();
+      const { data: { session } } = await supa.auth.getSession();
+      const isAdmin = (session?.user?.app_metadata?.role||'') === 'admin';
+      if(isAdmin) document.body.classList.add('admin');
 
-  // helpers
-  const fmt = n => Number(n||0).toFixed(2);
-  const normalizarPlaca = p => (p||'').toUpperCase().replace(/\s+/g,'').trim();
+      // Toggle menú móvil
+      document.getElementById('menuToggle').addEventListener('click', ()=>{
+        document.getElementById('navLinks').classList.toggle('open');
+      });
 
-  // --- detectar plan activo por placa
-  async function getPlanActivo(placa){
-    const { data:veh } = await supa.from('vehiculos').select('id').eq('placa',placa).maybeSingle();
-    if(!veh) return null;
-    const { data:plan } = await supa.from('vehiculos_planes').select('*')
-      .eq('vehiculo_id',veh.id).eq('activo',true)
-      .order('desde',{ascending:false}).limit(1).maybeSingle();
-    return plan||null;
-  }
+      // Cargar sugerencias y lista abiertos
+      await cargarSugerencias();
+      await cargarAbiertos();
 
-  function calcularCosto(t,salida,plan){
-    const e=new Date(t.hora_entrada);
-    const cat=t.categoria||'por_hora';
-    if(plan){
-      if(['diario_normal','diario_frecuente','noche','dia_y_noche_22','dia_y_noche_25'].includes(plan.plan))
-        return Number(plan.precio||0);
-    }
-    if(cat==='diario_normal')return precios.diario_normal;
-    if(cat==='diario_frecuente')return precios.diario_frecuente;
-    if(cat==='dia_y_noche_22')return precios.dia_y_noche_22;
-    if(cat==='dia_y_noche_25')return precios.dia_y_noche_25;
-    if(cat==='noche'){
-      const corte=new Date(e);const [hh,mm]=precios.corte_noche.split(':').map(Number);
-      corte.setHours(hh,mm||0,0,0);
-      if(salida<=corte)return precios.noche;
-      return precios.noche+calcularPorHora(corte,salida);
-    }
-    return calcularPorHora(e,salida);
-  }
-  const calcularPorHora=(a,b)=>{const ms=Math.max(0,b-a);const h=Math.ceil(ms/36e5);return h<=1?precios.p_primera:precios.p_primera+(h-1)*precios.p_extra;}
+      // Abrir
+      document.getElementById('btnAbrir').addEventListener('click', async ()=>{
+        const placa = document.getElementById('inPlaca').value.trim();
+        const tipo  = document.getElementById('inTipo').value;
+        const cat   = document.getElementById('inCat').value;
+        if(!placa){ toast('Ingresa la placa', false); return; }
+        try{
+          await ParkingAPI.crearTicket({ placa, tipoVehiculo:tipo, categoria:cat });
+          toast('Ticket abierto');
+          document.getElementById('inPlaca').value='';
+          await cargarSugerencias(); await cargarAbiertos();
+        }catch(e){ toast(e.message||String(e), false); }
+      });
 
-  async function listarAbiertos(){
-    const {data,error}=await supa.from('tickets').select('*').eq('estado','ingresado').order('hora_entrada',{ascending:false});
-    if(error)return toast(error.message,false);
-    abiertos=data||[];
-    const tb=document.getElementById('tbodyAbiertos');
-    tb.innerHTML=abiertos.map(t=>`
-      <tr>
-        <td>${t.placa_vehiculo}</td>
-        <td>${t.tipo_vehiculo}</td>
-        <td>${t.categoria}</td>
-        <td>${new Date(t.hora_entrada).toLocaleString()}</td>
-        <td><span class="badge badge-open">Abierto</span></td>
-        <td class="text-end"><button class="btn btn-blue btn-sm" onclick="cerrarManual('${t.placa_vehiculo}')">Cerrar</button></td>
-      </tr>
-    `).join('') || `<tr><td colspan="6" class="muted">No hay tickets abiertos.</td></tr>`;
-    document.getElementById('listaPlacas').innerHTML = abiertos.map(x=>`<option value="${x.placa_vehiculo}">`).join('');
-  }
+      // Cerrar
+      document.getElementById('btnCerrar').addEventListener('click', async ()=>{
+        const placa = document.getElementById('outPlaca').value.trim();
+        const pago = document.querySelector('input[name="pago"]:checked').value;
+        if(!placa){ toast('Ingresa la placa para cerrar', false); return; }
+        try{
+          const total = await ParkingAPI.cerrarTicket({ placa, tipo_pago:pago });
+          document.getElementById('cerrarMsg').textContent = `Cobrado: ${Number(total).toFixed(2)} Bs`;
+          toast('Ticket cerrado');
+          document.getElementById('outPlaca').value='';
+          await cargarSugerencias(); await cargarAbiertos();
+        }catch(e){ toast(e.message||String(e), false); }
+      });
 
-  async function abrirTicket(){
-    const placa=normalizarPlaca(document.getElementById('inPlaca').value);
-    const tipo=document.getElementById('inTipo').value;
-    const catSel=document.getElementById('inCategoria');
-    let cat=catSel.value;
-    if(!placa)return toast('Ingresa placa',false);
-    const plan=await getPlanActivo(placa);
-    if(plan){cat=plan.plan;catSel.value=cat;catSel.disabled=true;}
-    let {data:veh}=await supa.from('vehiculos').select('id').eq('placa',placa).maybeSingle();
-    if(!veh){const ins=await supa.from('vehiculos').insert({placa}).select('id').single();veh=ins.data;}
-    const {error}=await supa.from('tickets').insert({placa_vehiculo:placa,tipo_vehiculo:tipo,categoria:cat,estado:'ingresado'});
-    if(error)return toast(error.message,false);
-    toast('Ticket abierto');
-    document.getElementById('inPlaca').value='';
-    catSel.disabled=false;
-    await listarAbiertos();
-  }
+      async function cargarSugerencias(){
+        const placas = await ParkingAPI.placasAbiertas();
+        const dl = document.getElementById('opcPlacas');
+        dl.innerHTML = placas.map(p=>`<option value="${p}">`).join('');
+      }
 
-  async function cerrarTicket(){
-    const placa=normalizarPlaca(document.getElementById('outPlaca').value);
-    if(!placa)return toast('Ingresa placa',false);
-    const {data}=await supa.from('tickets').select('*').eq('placa_vehiculo',placa).eq('estado','ingresado').limit(1);
-    if(!data.length)return toast('No hay abierto',false);
-    const t=data[0];const plan=await getPlanActivo(placa);
-    const costo=calcularCosto(t,new Date(),plan);
-    const pago=document.querySelector('input[name="pago"]:checked').value;
-    const {error}=await supa.from('tickets').update({estado:'pagado',hora_salida:new Date().toISOString(),costo_total:costo,tipo_pago:pago}).eq('id',t.id);
-    if(error)return toast(error.message,false);
-    toast('Cerrado Bs '+fmt(costo));
-    await listarAbiertos();
-  }
+      async function cargarAbiertos(){
+        const list = await ParkingAPI.listarAbiertos();
+        const tb = document.getElementById('tbodyAbiertos');
+        tb.innerHTML = (list||[]).map(t => `
+          <tr>
+            <td class="mono">${t.placa_vehiculo}</td>
+            <td>${t.tipo_vehiculo}</td>
+            <td>${t.categoria||'-'}</td>
+            <td>${new Date(t.hora_entrada).toLocaleString()}</td>
+            <td>${t.operador_id ? t.operador_id.slice(0,6)+'…' : '-'}</td>
+            <td class="text-end">
+              ${isAdmin ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>` : ''}
+            </td>
+          </tr>
+        `).join('') || `<tr><td colspan="6" class="text-muted">Sin abiertos</td></tr>`;
 
-  function cerrarManual(p){
-    document.getElementById('outPlaca').value=p;
-    cerrarTicket();
-  }
-
-  async function init(){
-    await AuthUI.requireLogin();
-    document.getElementById('menuToggle').onclick=()=>document.getElementById('navLinks').classList.toggle('open');
-    document.getElementById('btnAbrir').onclick=abrirTicket;
-    document.getElementById('btnCerrar').onclick=cerrarTicket;
-    await listarAbiertos();
-  }
-  init();
+        if(isAdmin){
+          tb.querySelectorAll('button[data-id]').forEach(btn=>{
+            btn.addEventListener('click', async ()=>{
+              const id = btn.getAttribute('data-id');
+              if(!confirm('¿Cerrar este ticket manualmente?')) return;
+              try{
+                await ParkingAPI.cerrarTicketManual(id);
+                toast('Cerrado manual');
+                await cargarSugerencias(); await cargarAbiertos();
+              }catch(e){ toast(e.message||String(e), false); }
+            });
+          });
+        }
+      }
+    })();
   </script>
 </body>
 </html>
