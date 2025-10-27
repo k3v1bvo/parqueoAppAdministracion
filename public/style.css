@@ -160,3 +160,10 @@ nav.topbar button{
 .mt-2{ margin-top:.75rem }
 .mt-3{ margin-top:1rem }
 .mt-4{ margin-top:1.25rem }
+/* --- Parche navegación responsive global --- */
+.menu-toggle{display:none;cursor:pointer;background:none;border:0;color:#e5e7eb;font-size:1.5rem}
+.links.open{display:flex !important;flex-direction:column;gap:8px;background:#111827;position:absolute;top:60px;right:15px;padding:12px;border-radius:10px;border:1px solid #1f2937}
+@media (max-width: 992px){
+  .links{display:none}
+  .menu-toggle{display:block}
+}
