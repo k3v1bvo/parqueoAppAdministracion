@@ -37,7 +37,7 @@
 
   <main class="container">
     <div class="grid-2">
-      <!-- Abrir ticket -->
+      <!-- Abrir -->
       <section class="card">
         <h2>➕ Abrir ticket (Entrada)</h2>
         <label class="form-label">Placa</label>
@@ -63,7 +63,7 @@
         <p class="hint mt-2">Reglas: Día 08:00–19:59 → 15 normal / 12 frecuente. Noche (20:00–07:59) → 12. Si no cierra → 7 primera hora + 1 extra/h.</p>
       </section>
 
-      <!-- Cerrar ticket -->
+      <!-- Cerrar -->
       <section class="card">
         <h2>✅ Cerrar ticket (Salida)</h2>
         <label class="form-label">Placa (sugerencias de abiertas)</label>
@@ -81,7 +81,7 @@
       </section>
     </div>
 
-    <!-- Tickets abiertos (admin puede cerrar manual) -->
+    <!-- Abiertos -->
     <section class="card mt-3">
       <h3>⏳ Tickets abiertos <span class="admin-badge badge">Admin</span></h3>
       <div class="table-wrap">
@@ -94,7 +94,7 @@
       </div>
     </section>
 
-    <!-- Historial del operador (no solo abiertos) -->
+    <!-- Historial operador -->
     <section class="card mt-3">
       <h3>🧾 Historial de mis tickets</h3>
       <div class="filters">
@@ -129,17 +129,14 @@
       const isAdmin = (session?.user?.app_metadata?.role||'') === 'admin';
       if(isAdmin) document.body.classList.add('admin');
 
-      // Toggle menú móvil
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
 
-      // Inicial
       await cargarSugerencias();
       await cargarAbiertos();
       await cargarHistorial();
 
-      // Abrir
       document.getElementById('btnAbrir').addEventListener('click', async ()=>{
         const placa = document.getElementById('inPlaca').value.trim();
         const tipo  = document.getElementById('inTipo').value;
@@ -152,7 +149,6 @@
         }catch(e){ toast(e.message||String(e), false); }
       });
 
-      // Cerrar
       document.getElementById('btnCerrar').addEventListener('click', async ()=>{
         const placa = document.getElementById('outPlaca').value.trim();
         const pago = document.querySelector('input[name="pago"]:checked').value;
@@ -165,7 +161,6 @@
         }catch(e){ toast(e.message||String(e), false); }
       });
 
-      // Cambio de período historial
       document.getElementById('periodo').addEventListener('change', cargarHistorial);
 
       async function cargarSugerencias(){
@@ -185,16 +180,12 @@
             <td>${new Date(t.hora_entrada).toLocaleString()}</td>
             <td>${t.operador_id ? t.operador_id.slice(0,6)+'…' : '-'}</td>
             <td class="text-end">
-              ${
-                isAdmin
-                ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>`
-                : ''
-              }
+              ${document.body.classList.contains('admin') ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>` : ''}
             </td>
           </tr>
         `).join('') || `<tr><td colspan="6" class="text-muted">Sin abiertos</td></tr>`;
 
-        if(isAdmin){
+        if(document.body.classList.contains('admin')){
           tb.querySelectorAll('button[data-id]').forEach(btn=>{
             btn.addEventListener('click', async ()=>{
               const id = btn.getAttribute('data-id');
@@ -227,5 +218,7 @@
       }
     })();
   </script>
+
+  <datalist id="opcPlacas"></datalist>
 </body>
 </html>

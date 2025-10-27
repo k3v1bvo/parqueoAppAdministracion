@@ -29,7 +29,7 @@
 
   <main class="container">
     <section class="card">
-      <h2>Tarifas por tipo de vehículo (plan por horas)</h2>
+      <h2>Tarifas por tipo de vehículo (fallback por horas)</h2>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
           <thead><tr><th>Tipo</th><th class="text-end">Primera hora</th><th class="text-end">Hora extra</th><th class="text-end">Guardar</th></tr></thead>
@@ -37,8 +37,8 @@
         </table>
       </div>
       <p class="hint mt-2">
-        <strong>Reglas vigentes:</strong> Día (08:00–19:59) → 15 normal / 12 frecuente. Noche (20:00–07:59) → 12.  
-        Si no cerró y continúa, aplica <span class="mono">7</span> primera hora + <span class="mono">1</span> extra/h.
+        <strong>Reglas vigentes (al cerrar ticket):</strong> Día (08:00–19:59) → 15 normal / 12 frecuente. Noche (20:00–07:59) → 12.  
+        Si no entra en esas categorías, aplica <span class="mono">7</span> primera hora + <span class="mono">1</span> extra/h.
       </p>
     </section>
   </main>
@@ -50,7 +50,6 @@
     (async ()=>{
       await AuthUI.requireAdmin();
 
-      // Toggle menú
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });

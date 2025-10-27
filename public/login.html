@@ -11,7 +11,7 @@
     .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;margin-bottom:14px}
     .brand i{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:rgba(56,189,248,.18);border:1px solid rgba(56,189,248,.4)}
     .form-label{color:#9fb0c5;margin-top:10px;margin-bottom:6px;display:block}
-    .form-control,.form-select{width:100%;background:#0b1220;border:1px solid #1f2937;color:#e5e7eb;border-radius:10px;padding:10px}
+    .form-control{width:100%;background:#0b1220;border:1px solid #1f2937;color:#e5e7eb;border-radius:10px;padding:10px}
     .btn{width:100%;background:#22c55e;border:0;border-radius:10px;padding:12px;font-weight:700;margin-top:16px;cursor:pointer}
     .hint{color:#94a3b8;font-size:12px;margin-top:8px}
     .err{color:#fca5a5;margin-top:8px;min-height:20px}
@@ -21,37 +21,29 @@
   <div class="card">
     <div class="brand"><i>🅿</i> ParqueoApp</div>
     <p class="hint">Ingresa con tu correo y contraseña.</p>
-
     <label class="form-label">Correo</label>
     <input id="email" class="form-control" type="email" placeholder="tucorreo@dominio.com" />
-
     <label class="form-label">Contraseña</label>
     <input id="password" class="form-control" type="password" placeholder="••••••••" />
-
     <button id="btnLogin" class="btn">Ingresar</button>
     <div id="msg" class="err"></div>
   </div>
 
-  <!-- Orden: SDK → config.js (NO cargues auth.js aquí) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script>
     const supaLogin = window.supabase.createClient(window.__env.SUPABASE_URL, window.__env.SUPABASE_ANON);
 
-    // Si ya hay sesión, entra directo al dashboard
     (async function checkSession(){
       const { data:{ session } } = await supaLogin.auth.getSession();
       if(session){ location.href = 'dashboard.html'; }
     })();
 
-    // Autorrelleno desde querystring ?email=...&password=...
     (function autofillFromQS(){
       const qs = new URLSearchParams(location.search);
       const e = qs.get('email'); const p = qs.get('password');
       if(e) document.getElementById('email').value = decodeURIComponent(e);
       if(p) document.getElementById('password').value = decodeURIComponent(p);
-      // Si quieres auto-login cuando vienen ambos, descomenta:
-      // if(e && p) document.getElementById('btnLogin').click();
     })();
 
     document.getElementById('btnLogin').addEventListener('click', async ()=>{

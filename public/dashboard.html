@@ -72,7 +72,6 @@
     </section>
   </main>
 
-  <!-- Orden correcto de scripts: SDK → config.js → auth.js → page -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="auth.js"></script>
@@ -82,25 +81,20 @@
     (async ()=>{
       await AuthUI.requireLogin();
 
-      // Toggle menú
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
 
-      // KPIs
       await cargarKPIs();
-      // Recientes
       await cargarRecientes();
 
       async function cargarKPIs(){
-        // Abiertos
         const { data: ab } = await supa
           .from('tickets').select('id').eq('estado','ingresado');
         document.getElementById('kpiAbiertos').textContent = (ab||[]).length;
 
-        // Hoy (rango)
         const start = new Date(); start.setHours(0,0,0,0);
-        const end = new Date(); end.setHours(23,59,59,999);
+        const end   = new Date(); end.setHours(23,59,59,999);
         const sISO = start.toISOString(), eISO = end.toISOString();
 
         const { data: hoy } = await supa
@@ -108,7 +102,6 @@
           .gte('hora_entrada', sISO).lte('hora_entrada', eISO);
         document.getElementById('kpiHoy').textContent = (hoy||[]).length;
 
-        // Recaudado hoy = tickets pagados hoy + extras hoy − egresos hoy
         const { data: tks } = await supa.from('tickets')
           .select('costo_total,hora_salida,estado')
           .gte('hora_salida', sISO).lte('hora_salida', eISO)
@@ -124,7 +117,6 @@
 
         const sum = (arr, k)=> (arr||[]).reduce((a,b)=> a + safeN(b[k]), 0);
         const total = sum(tks,'costo_total') + sum(ex,'monto') - sum(eg,'monto');
-
         document.getElementById('kpiRecaudo').textContent = total.toFixed(2);
       }
 

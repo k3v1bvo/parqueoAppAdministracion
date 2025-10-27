@@ -3,33 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin · Analítica & Gastos</title>
+  <title>Admin · ParqueoApp</title>
   <link rel="stylesheet" href="style.css" />
   <div id="toast" class="toast"></div>
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
   <style>
-    /* Ajustes visuales mínimos (dark) complementando tu style.css */
-    .charts-grid{ display:grid; gap:18px; grid-template-columns: 1fr; }
-    @media (min-width: 992px){ .charts-grid{ grid-template-columns: 1fr 1fr; } }
-    .chart-card{ background:#0b1220; border:1px solid #1f2937; border-radius:14px; padding:14px }
-    .chart-card h3{ margin:0 0 8px; font-size:16px; color:#9fb0c5 }
-    canvas{ width:100% !important; height:280px !important; }
-    .mono{ font-variant-numeric: tabular-nums }
-    .kpis{ display:grid; gap:12px; grid-template-columns: repeat(2, 1fr); }
-    @media (min-width:992px){ .kpis{ grid-template-columns: repeat(4, 1fr); } }
-    .stat{ display:flex; gap:12px; align-items:center; background:#0b1220; border:1px solid #1f2937; border-radius:14px; padding:12px }
-    .icon{ width:42px;height:42px; border-radius:10px; display:grid;place-items:center; border:1px solid rgba(34,197,94,.45); background:rgba(34,197,94,.15) }
-    .icon svg{ width:22px;height:22px }
-    .icon--cash{ background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.5) }
-    .value{ font-weight:800; font-size:20px }
-    .table-wrap{ overflow:auto }
-    .btn-danger{ background:#ef4444;border:0 }
-    .btn-primary{ background:#38bdf8;border:0 }
-    .btn-secondary{ background:#22c55e;border:0 }
-    .form-select,.form-control{ background:#0b1220;border:1px solid #1f2937;color:#e5e7eb }
-    .hint{ color:#94a3b8; font-size:12px }
+    .cards{display:grid;gap:14px;grid-template-columns:1fr}
+    @media(min-width:992px){.cards{grid-template-columns:repeat(4,1fr)}}
+    .card{background:#0b1220;border:1px solid #1f2937;border-radius:16px;padding:16px}
+    .kpi{display:flex;align-items:center;gap:12px}
+    .k-name{color:#9fb0c5;font-size:12px}
+    .value{font-weight:800;font-size:22px}
+    .mono{font-variant-numeric:tabular-nums}
+    .table-wrap{overflow:auto}
   </style>
 </head>
 <body>
@@ -43,174 +28,79 @@
       <a href="ingresos.html">🚘 Tickets</a>
       <a href="planes.html">📅 Planes</a>
       <a href="tarifas.html">💲 Tarifas</a>
-      <a href="extras.html">🧾 Ingresos extra</a>
       <button onclick="AuthUI.logout()">Salir</button>
     </div>
   </nav>
 
   <main class="container">
-
-    <!-- Filtros -->
     <section class="card">
       <div class="row g-3">
         <div class="col-12 col-lg-3">
           <label class="form-label">Período</label>
           <select id="periodo" class="form-select">
             <option value="daily">Hoy</option>
-            <option value="weekly">Esta semana</option>
-            <option value="monthly" selected>Este mes</option>
+            <option value="weekly" selected>Esta semana</option>
+            <option value="monthly">Este mes</option>
             <option value="yearly">Este año</option>
             <option value="alltime">Todo</option>
           </select>
-          <div class="hint">Si usas rango, se ignora este selector.</div>
         </div>
-        <div class="col-6 col-lg-2">
-          <label class="form-label">Desde</label>
-          <input id="fdesde" type="date" class="form-control" />
-        </div>
-        <div class="col-6 col-lg-2">
-          <label class="form-label">Hasta</label>
-          <input id="fhasta" type="date" class="form-control" />
-        </div>
-        <div class="col-12 col-lg-3">
-          <label class="form-label">Empleado (opcional)</label>
-          <select id="empleado" class="form-select">
-            <option value="">Todos</option>
-          </select>
-        </div>
-        <div class="col-12 col-lg-2 d-grid">
+        <div class="col-12 col-lg-3 d-grid align-end">
           <label class="form-label">&nbsp;</label>
-          <button id="btnAplicar" class="btn btn-primary">Aplicar</button>
-        </div>
-      </div>
-      <div class="row g-2 mt-2">
-        <div class="col-12 col-lg-3 d-grid">
-          <button id="btnCSVPerDia" class="btn btn-secondary">⬇️ Exportar CSV · Día a día</button>
-        </div>
-        <div class="col-12 col-lg-3 d-grid">
-          <button id="btnCSVEgresos" class="btn btn-secondary">⬇️ Exportar CSV · Egresos</button>
-        </div>
-        <div class="col-12 col-lg-3 d-grid">
-          <button id="btnCSVTicketsTipo" class="btn btn-secondary">⬇️ Exportar CSV · Tickets por vehículo</button>
+          <button id="btnRefrescar" class="btn btn-primary">Refrescar</button>
         </div>
       </div>
     </section>
 
-    <!-- KPIs -->
-    <section class="kpis mt-3">
-      <div class="stat">
-        <div class="icon icon--cash"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M21 7H3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Zm-2 8a3 3 0 0 1-3-3a3 3 0 0 1 3-3Zm-7-6a3 3 0 0 0 0 6a3 3 0 0 0 0-6ZM5 9a3 3 0 0 1 3 3a3 3 0 0 1-3 3Z"/></svg></div>
+    <section class="cards mt-3">
+      <div class="card kpi">
         <div>
-          <div class="text-muted">Ingresos Tickets</div>
-          <div id="kpiTickets" class="value mono">0.00</div>
+          <div class="k-name">Tickets abiertos</div>
+          <div id="kpiAbiertos" class="value">0</div>
         </div>
       </div>
-      <div class="stat">
-        <div class="icon icon--cash"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M2 7h20v10H2z"/></svg></div>
+      <div class="card kpi">
         <div>
-          <div class="text-muted">Ingresos Extra</div>
-          <div id="kpiExtra" class="value mono">0.00</div>
+          <div class="k-name">Ingresos por tickets</div>
+          <div id="kpiIngT" class="value mono">0.00</div>
         </div>
       </div>
-      <div class="stat">
-        <div class="icon" style="background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.5)"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16l-1.5 12h-13zM8 6l.5-2h7L16 6"/></svg></div>
+      <div class="card kpi">
         <div>
-          <div class="text-muted">Egresos</div>
-          <div id="kpiEgresos" class="value mono">0.00</div>
+          <div class="k-name">Ingresos extra</div>
+          <div id="kpiIngX" class="value mono">0.00</div>
         </div>
       </div>
-      <div class="stat">
-        <div class="icon" style="background:rgba(56,189,248,.18);border-color:rgba(56,189,248,.5)"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17h18v2H3zm0-6h12v2H3zm0-6h6v2H3z"/></svg></div>
+      <div class="card kpi">
         <div>
-          <div class="text-muted">Neto (Ing − Egr)</div>
-          <div id="kpiNeto" class="value mono">0.00</div>
+          <div class="k-name">Egresos</div>
+          <div id="kpiEgr" class="value mono">0.00</div>
         </div>
       </div>
     </section>
 
-    <!-- Gráficas -->
-    <section class="charts-grid mt-3">
-      <div class="chart-card">
-        <h3>📊 Totales por día (Tickets / Extras / Egresos) + Neto</h3>
-        <canvas id="chTotals"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>💳 Pagos por día (Efectivo vs QR)</h3>
-        <canvas id="chPagos"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>🥧 Participación de pagos</h3>
-        <canvas id="chPiePagos"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>🚘 Distribución por tipo de vehículo</h3>
-        <canvas id="chVehiculo"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>🏆 Top 5 días con mejor neto</h3>
-        <canvas id="chTopDias"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>⚠️ Bottom 5 días con peor neto</h3>
-        <canvas id="chWorstDias"></canvas>
-      </div>
-      <div class="chart-card" style="grid-column:1 / -1">
-        <h3>👥 Ranking por empleado (Tickets + Extras)</h3>
-        <canvas id="chEmpleados"></canvas>
-      </div>
-    </section>
-
-    <!-- Registrar gasto -->
     <section class="card mt-3">
-      <h2>➖ Registrar gasto</h2>
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <label class="form-label">Concepto</label>
-          <input id="gConcepto" class="form-control" placeholder="Ej: letrero, limpieza, mantenimiento...">
-        </div>
-        <div class="col-12 col-lg-3">
-          <label class="form-label">Monto (Bs)</label>
-          <input id="gMonto" type="number" step="0.01" class="form-control" placeholder="0.00">
-        </div>
-        <div class="col-12 col-lg-3 d-grid">
-          <label class="form-label">&nbsp;</label>
-          <button id="btnGasto" class="btn btn-danger">Guardar gasto</button>
-        </div>
-      </div>
-      <p class="text-muted mt-2">Los egresos impactan el <strong>Neto</strong> del período seleccionado.</p>
+      <h3>Neto del período</h3>
+      <div id="kpiNeto" class="value mono">0.00</div>
     </section>
 
-    <!-- Lista de egresos -->
     <section class="card mt-3">
-      <h3>🧾 Egresos del período</h3>
+      <h3>Por operador</h3>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
-          <thead><tr><th>Fecha</th><th>Concepto</th><th class="text-end">Monto (Bs)</th></tr></thead>
-          <tbody id="tbodyEgresos"></tbody>
+          <thead><tr><th>Operador</th><th class="text-end">Tickets</th><th class="text-end">Monto Tickets</th><th class="text-end">Ingresos Extra</th></tr></thead>
+          <tbody id="tbodyOp"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- Acumulado histórico -->
     <section class="card mt-3">
-      <h3>📈 Acumulado histórico</h3>
-      <div class="row g-3">
-        <div class="col-12 col-lg-3">
-          <div class="text-muted">Tickets</div>
-          <div id="histTickets" class="value mono">0.00</div>
-        </div>
-        <div class="col-12 col-lg-3">
-          <div class="text-muted">Extras</div>
-          <div id="histExtras" class="value mono">0.00</div>
-        </div>
-        <div class="col-12 col-lg-3">
-          <div class="text-muted">Egresos</div>
-          <div id="histEgresos" class="value mono">0.00</div>
-        </div>
-        <div class="col-12 col-lg-3">
-          <div class="text-muted">Neto total</div>
-          <div id="histNeto" class="value mono">0.00</div>
-        </div>
+      <h3>Pagos recientes</h3>
+      <div class="table-wrap">
+        <table class="table table-dark table-borderless align-middle">
+          <thead><tr><th>Placa</th><th>Tipo</th><th>Entrada</th><th>Salida</th><th class="text-end">Total (Bs)</th></tr></thead>
+        <tbody id="tbodyRec"></tbody>
+        </table>
       </div>
     </section>
   </main>
@@ -219,280 +109,52 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
-    let chTotals, chPagos, chPiePagos, chVehiculo, chTop, chWorst, chEmp;
-    const chartKeep = (inst, cfg, elId)=>{
-      if(inst){ inst.data=cfg.data; inst.options=cfg.options; inst.update(); return inst; }
-      return new Chart(document.getElementById(elId), cfg);
-    };
-    const fmt = (n)=> Number(n||0).toFixed(2);
+    const N = (x)=> Number(x||0);
 
     (async ()=>{
       await AuthUI.requireAdmin();
-
-      // Cargar empleados al filtro
-      await cargarEmpleados();
-
-      // Eventos
-      document.getElementById('btnAplicar').addEventListener('click', loadTodo);
-      document.getElementById('btnGasto').addEventListener('click', guardarGasto);
-      document.getElementById('btnCSVPerDia').addEventListener('click', exportPerDia);
-      document.getElementById('btnCSVEgresos').addEventListener('click', exportEgresos);
-      document.getElementById('btnCSVTicketsTipo').addEventListener('click', exportTicketsPorTipo);
 
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
 
-      // Cargas iniciales
+      document.getElementById('btnRefrescar').addEventListener('click', loadTodo);
+      document.getElementById('periodo').addEventListener('change', loadTodo);
+
       await loadTodo();
-      await cargarAcumulado();
-
-      async function cargarEmpleados(){
-        try{
-          const { data, error } = await supa.from('usuarios').select('id,nombre,email,rol').order('nombre');
-          if(error) return;
-          const sel = document.getElementById('empleado');
-          (data||[]).forEach(u=>{
-            const opt=document.createElement('option');
-            opt.value=u.id;
-            opt.textContent=`${u.nombre||u.email}${u.rol==='admin'?' (Admin)':''}`;
-            sel.appendChild(opt);
-          });
-        }catch(_){}
-      }
-
-      function getRangeFromUI(){
-        const d = document.getElementById('fdesde').value;
-        const h = document.getElementById('fhasta').value;
-        if(d && h){
-          const startISO = new Date(d+"T00:00:00").toISOString();
-          const endISO   = new Date(h+"T23:59:59").toISOString();
-          return { startISO, endISO };
-        }
-        const periodo = document.getElementById('periodo').value;
-        return ParkingAPI.rango(periodo);
-      }
-
-      async function guardarGasto(){
-        const c = document.getElementById('gConcepto').value.trim();
-        const m = parseFloat(document.getElementById('gMonto').value);
-        if(!c || !m || m<=0){ toast('Completa concepto y monto válido', false); return; }
-        try{
-          await ParkingAPI.crearEgresoAdmin({ concepto:c, monto:m });
-          toast('Gasto registrado');
-          document.getElementById('gConcepto').value='';
-          document.getElementById('gMonto').value='';
-          await loadTodo();
-          await cargarAcumulado();
-        }catch(e){ toast(e.message||String(e), false); }
-      }
 
       async function loadTodo(){
-        const empId = document.getElementById('empleado').value || "";
-        const { startISO, endISO } = getRangeFromUI();
-        const res = await ParkingAPI.adminResumenRango(startISO, endISO, empId);
+        const preset = document.getElementById('periodo').value;
+        const { startISO, endISO } = ParkingAPI.rango(preset);
 
-        // KPIs
-        setText('kpiTickets', res.tickets_total);
-        setText('kpiExtra',   res.extras_total);
-        setText('kpiEgresos', res.egresos_total);
-        setText('kpiNeto',    res.neto_total);
+        const res = await ParkingAPI.adminResumenRango({ startISO, endISO });
 
-        // Egresos tabla
-        const list = await ParkingAPI.listarEgresosAdmin({ desdeISO:startISO, hastaISO:endISO, adminId:empId||null });
-        const tb = document.getElementById('tbodyEgresos');
-        tb.innerHTML = (list||[]).map(g => `
+        document.getElementById('kpiAbiertos').textContent = res.abiertos;
+        document.getElementById('kpiIngT').textContent = N(res.ingresosTickets).toFixed(2);
+        document.getElementById('kpiIngX').textContent = N(res.ingresosExtra).toFixed(2);
+        document.getElementById('kpiEgr').textContent  = N(res.egresos).toFixed(2);
+        document.getElementById('kpiNeto').textContent = N(res.neto).toFixed(2);
+
+        const tbOp = document.getElementById('tbodyOp');
+        tbOp.innerHTML = (res.porOperador||[]).map(o=>`
           <tr>
-            <td>${new Date(g.creado_at).toLocaleString()}</td>
-            <td>${escapeHtml(g.concepto)}</td>
-            <td class="text-end mono">-${fmt(g.monto)}</td>
+            <td>${o.nombre||'—'}</td>
+            <td class="text-end mono">${o.tickets||0}</td>
+            <td class="text-end mono">${N(o.monto).toFixed(2)}</td>
+            <td class="text-end mono">${N(o.extra||0).toFixed(2)}</td>
           </tr>
-        `).join('') || `<tr><td colspan="3" class="text-muted">Sin egresos en el período</td></tr>`;
+        `).join('') || `<tr><td colspan="4" class="text-muted">Sin datos</td></tr>`;
 
-        // Por día
-        const labels = sortKeys(res.porDiaNeto);
-        const vTickets = arrFromMap(res.porDiaTickets, labels);
-        const vExtras  = arrFromMap(res.porDiaExtras, labels);
-        const vEgresos = arrFromMap(res.porDiaEgresos, labels).map(x=>-1*Number(x||0));
-        const vNeto    = arrFromMap(res.porDiaNeto, labels);
-
-        // Pagos por día
-        const vEfec = arrFromMap(res.pagos.porDia.efectivo, labels);
-        const vQR   = arrFromMap(res.pagos.porDia.qr, labels);
-
-        // --- Gráfica Totales + Neto ---
-        chTotals = chartKeep(chTotals, {
-          type:'bar',
-          data:{
-            labels,
-            datasets:[
-              { label:'Tickets', data:vTickets, backgroundColor:'rgba(34,197,94,.55)', borderColor:'rgba(34,197,94,.9)', borderWidth:1, stack:'ing' },
-              { label:'Extras',  data:vExtras,  backgroundColor:'rgba(59,130,246,.45)', borderColor:'rgba(59,130,246,.9)', borderWidth:1, stack:'ing' },
-              { label:'Egresos', data:vEgresos, backgroundColor:'rgba(239,68,68,.45)', borderColor:'rgba(239,68,68,.85)', borderWidth:1, stack:'egr' },
-              { type:'line', label:'Neto', data:vNeto, tension:.25, yAxisID:'y', borderColor:'rgba(56,189,248,.95)', pointRadius:3 }
-            ]
-          },
-          options:{
-            responsive:true,
-            interaction:{ mode:'index', intersect:false },
-            plugins:{ legend:{ labels:{ color:'#cbd5e1' } }, tooltip:{ callbacks:{ label:ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)} Bs` } } },
-            scales:{ x:{ ticks:{ color:'#9fb0c5' }, grid:{ color:'rgba(148,163,184,.15)'} },
-                     y:{ ticks:{ color:'#9fb0c5' }, grid:{ color:'rgba(148,163,184,.15)'} } }
-          }
-        }, 'chTotals');
-
-        // --- Gráfica pagos por día ---
-        chPagos = chartKeep(chPagos,{
-          type:'bar',
-          data:{ labels, datasets:[
-            { label:'Efectivo', data:vEfec, backgroundColor:'rgba(34,197,94,.65)' },
-            { label:'QR',       data:vQR,   backgroundColor:'rgba(250,204,21,.75)' }
-          ]},
-          options:{
-            responsive:true,
-            interaction:{ mode:'index', intersect:false },
-            plugins:{ legend:{ labels:{ color:'#cbd5e1' } }, tooltip:{ callbacks:{ label:(c)=> `${c.dataset.label}: ${fmt(c.raw)} Bs` } } },
-            scales:{ x:{ ticks:{ color:'#9fb0c5' }, grid:{ color:'rgba(148,163,184,.15)'} },
-                     y:{ ticks:{ color:'#9fb0c5' }, grid:{ color:'rgba(148,163,184,.15)'} } }
-          }
-        }, 'chPagos');
-
-        // --- Donut participación de pagos ---
-        chPiePagos = chartKeep(chPiePagos, {
-          type:'doughnut',
-          data:{ labels:['Efectivo','QR'],
-            datasets:[{ data:[res.pagos.efectivo, res.pagos.qr],
-              backgroundColor:['rgba(34,197,94,.75)','rgba(250,204,21,.85)'],
-              borderColor:['rgba(34,197,94,1)','rgba(250,204,21,1)'], borderWidth:1
-            }]
-          },
-          options:{ plugins:{ legend:{ labels:{ color:'#cbd5e1' } }, tooltip:{ callbacks:{ label:(c)=> `${c.label}: ${fmt(c.raw)} Bs` } } } }
-        }, 'chPiePagos');
-
-        // --- Distribución por tipo de vehículo (tickets pagados) ---
-        const veh = await ticketsPorTipo(startISO, endISO, empId);
-        chVehiculo = chartKeep(chVehiculo, {
-          type:'bar',
-          data:{ labels:Object.keys(veh), datasets:[{ label:'Tickets pagados', data:Object.values(veh), backgroundColor:'rgba(147,197,253,.75)' }]},
-          options:{ plugins:{ legend:{ labels:{ color:'#cbd5e1' } }, tooltip:{ callbacks:{ label:(c)=> `${fmt(c.raw)} Bs` } } },
-                    scales:{ x:{ ticks:{ color:'#9fb0c5' } }, y:{ ticks:{ color:'#9fb0c5' } } } }
-        }, 'chVehiculo');
-
-        // --- Top & Worst días por neto ---
-        const netPairs = labels.map((d,i)=>[d, Number(vNeto[i]||0)]);
-        const top = [...netPairs].sort((a,b)=>b[1]-a[1]).slice(0,5);
-        const worst = [...netPairs].sort((a,b)=>a[1]-b[1]).slice(0,5);
-
-        chTop = chartKeep(chTop,{
-          type:'bar',
-          data:{ labels: top.map(x=>x[0]), datasets:[{ label:'Neto', data: top.map(x=>x[1]), backgroundColor:'rgba(34,197,94,.65)'}]},
-          options:{ plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{ callbacks:{label:(c)=> `${fmt(c.raw)} Bs`}} },
-                    scales:{ x:{ticks:{color:'#9fb0c5'}}, y:{ticks:{color:'#9fb0c5'}} } }
-        }, 'chTopDias');
-
-        chWorst = chartKeep(chWorst,{
-          type:'bar',
-          data:{ labels: worst.map(x=>x[0]), datasets:[{ label:'Neto', data: worst.map(x=>x[1]), backgroundColor:'rgba(239,68,68,.65)'}]},
-          options:{ plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{ callbacks:{label:(c)=> `${fmt(c.raw)} Bs`}} },
-                    scales:{ x:{ticks:{color:'#9fb0c5'}}, y:{ticks:{color:'#9fb0c5'}} } }
-        }, 'chWorstDias');
-        
-        // --- Ranking por empleado ---
-        const empMap = res.porEmpleadoCombined; // Map(id -> {tickets, extras, total})
-        const empEntries = Array.from(empMap.entries()).map(([id,vals])=>({ id, ...vals }));
-        empEntries.sort((a,b)=>b.total - a.total);
-        const ids = empEntries.map(e=>e.id).filter(Boolean);
-        let nameById = {};
-        if(ids.length){
-          const { data } = await supa.from('usuarios').select('id,nombre,email').in('id', ids);
-          (data||[]).forEach(u=> nameById[u.id] = (u.nombre || u.email || u.id));
-        }
-        const empLabels = empEntries.map(e=> nameById[e.id] || (e.id ? e.id.slice(0,6)+'…' : '—') );
-        const empTotals = empEntries.map(e=> Number(e.total||0));
-        chEmp = chartKeep(chEmp,{
-          type:'bar',
-          data:{ labels: empLabels, datasets:[{ label:'Total (Tickets+Extras)', data: empTotals, backgroundColor:'rgba(56,189,248,.65)'}]},
-          options:{ plugins:{ legend:{labels:{color:'#cbd5e1'}}, tooltip:{ callbacks:{label:(c)=> `${fmt(c.raw)} Bs`}} },
-                    scales:{ x:{ticks:{color:'#9fb0c5'}}, y:{ticks:{color:'#9fb0c5'}} } }
-        }, 'chEmpleados');
-
-        // Guarda último dataset por día para exportaciones
-        window.__adminCache = { labels, vTickets, vExtras, vEgresos, vNeto, vEfec, vQR, listEgresos:list, veh:veh, range:{startISO,endISO}, empId };
-      }
-
-      async function ticketsPorTipo(startISO, endISO, empId){
-        // Suma tickets pagados por tipo_vehiculo en el rango
-        let q = supa.from('tickets')
-          .select('costo_total, estado, tipo_vehiculo, operador_id, hora_entrada')
-          .gte('hora_entrada', startISO).lte('hora_entrada', endISO);
-        const { data, error } = await q;
-        if(error) return { auto:0, moto:0, bicicleta:0 };
-        const paid = (data||[]).filter(t=>t.estado==='pagado' && (!empId || t.operador_id===empId));
-        const agg = { auto:0, moto:0, bicicleta:0 };
-        paid.forEach(t=>{
-          const k = (t.tipo_vehiculo||'').toLowerCase();
-          if(agg[k]===undefined) agg[k]=0;
-          agg[k] += Number(t.costo_total||0);
-        });
-        return agg;
-      }
-
-      async function cargarAcumulado(){
-        const a = await ParkingAPI.acumuladoGlobal();
-        setText('histTickets', a.totalTickets);
-        setText('histExtras',  a.totalExtras);
-        setText('histEgresos', a.totalEgresos);
-        setText('histNeto',    a.neto);
-      }
-
-      // ----- Exportaciones -----
-      function exportPerDia(){
-        const c = window.__adminCache || {};
-        const rows = [['fecha','tickets','extras','egresos','neto','efectivo','qr']];
-        (c.labels||[]).forEach((d,i)=>{
-          rows.push([d, fmt(c.vTickets[i]), fmt(c.vExtras[i]), fmt(-1*Number(c.vEgresos[i]||0)), fmt(c.vNeto[i]), fmt(c.vEfec[i]), fmt(c.vQR[i])]);
-        });
-        downloadCSV(csvEncode(rows), `resumen-dia-a-dia.csv`);
-      }
-      function exportEgresos(){
-        const c = window.__adminCache || {};
-        const rows = [['fecha','concepto','monto']];
-        (c.listEgresos||[]).forEach(g=>{
-          rows.push([new Date(g.creado_at).toISOString(), (g.concepto||'').replace(/\n/g,' '), `-${fmt(g.monto)}`]);
-        });
-        downloadCSV(csvEncode(rows), `egresos-periodo.csv`);
-      }
-      async function exportTicketsPorTipo(){
-        const c = window.__adminCache || {};
-        const v = c.veh || {auto:0,moto:0,bicicleta:0};
-        const rows = [['tipo_vehiculo','monto_pagado']];
-        Object.entries(v).forEach(([k,val])=> rows.push([k, fmt(val)]));
-        downloadCSV(csvEncode(rows), `tickets-por-vehiculo.csv`);
-      }
-
-      function csvEncode(rows){
-        return rows.map(r=> r.map(val=>{
-          const s = String(val??'');
-          return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-        }).join(',')).join('\n');
-      }
-      function downloadCSV(text, filename){
-        const blob = new Blob([text], {type:'text/csv;charset=utf-8;'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-        URL.revokeObjectURL(url);
-      }
-
-      // Helpers
-      function setText(id, num){ document.getElementById(id).textContent = fmt(num); }
-      function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-      function sortKeys(mapLike){
-        const arr = Array.from((mapLike&&mapLike.entries) ? mapLike.entries() : Object.entries(mapLike||{}));
-        return arr.map(x=>x[0]).sort((a,b)=> a.localeCompare(b));
-      }
-      function arrFromMap(mapLike, labels){
-        const m = (mapLike&&mapLike.get) ? (k)=> mapLike.get(k) : (k)=> (mapLike||{})[k];
-        return labels.map(k=> Number(m(k)||0));
+        const tbR = document.getElementById('tbodyRec');
+        tbR.innerHTML = (res.recientes||[]).map(t=>`
+          <tr>
+            <td class="mono">${t.placa_vehiculo}</td>
+            <td>${t.tipo_vehiculo}</td>
+            <td>${t.hora_entrada ? new Date(t.hora_entrada).toLocaleString() : '-'}</td>
+            <td>${t.hora_salida  ? new Date(t.hora_salida ).toLocaleString() : '-'}</td>
+            <td class="text-end mono">${N(t.costo_total).toFixed(2)}</td>
+          </tr>
+        `).join('') || `<tr><td colspan="5" class="text-muted">Sin pagos en el período</td></tr>`;
       }
     })();
   </script>
