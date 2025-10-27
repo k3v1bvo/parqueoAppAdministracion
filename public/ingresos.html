@@ -16,6 +16,8 @@
     .admin-badge{display:none}
     body.admin .admin-badge{display:inline-block}
     datalist option{color:#000}
+    .filters{display:grid;gap:10px;grid-template-columns:1fr}
+    @media(min-width:992px){.filters{grid-template-columns:180px 1fr}}
   </style>
 </head>
 <body>
@@ -58,7 +60,7 @@
           </div>
         </div>
         <button id="btnAbrir" class="btn btn-primary mt-3">Abrir ticket</button>
-        <p class="hint mt-2">Reglas: Día 08:00–19:59 → Normal 15 / Frecuente 12. Noche (20:00–07:59) → 12. Si excede y no cierra → 7 primera hora + 1 extra/h.</p>
+        <p class="hint mt-2">Reglas: Día 08:00–19:59 → 15 normal / 12 frecuente. Noche (20:00–07:59) → 12. Si no cierra → 7 primera hora + 1 extra/h.</p>
       </section>
 
       <!-- Cerrar ticket -->
@@ -91,12 +93,36 @@
         </table>
       </div>
     </section>
+
+    <!-- Historial del operador (no solo abiertos) -->
+    <section class="card mt-3">
+      <h3>🧾 Historial de mis tickets</h3>
+      <div class="filters">
+        <select id="periodo" class="form-select">
+          <option value="daily">Hoy</option>
+          <option value="weekly" selected>Esta semana</option>
+          <option value="monthly">Este mes</option>
+          <option value="alltime">Todo</option>
+        </select>
+        <div></div>
+      </div>
+      <div class="table-wrap mt-2">
+        <table class="table table-dark table-borderless align-middle">
+          <thead><tr>
+            <th>Placa</th><th>Tipo</th><th>Estado</th><th>Entrada</th><th>Salida</th><th class="text-end">Total (Bs)</th>
+          </tr></thead>
+          <tbody id="tbodyHistorial"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
+    const fmt = (n)=> Number(n||0).toFixed(2);
+
     (async ()=>{
       await AuthUI.requireLogin();
       const { data: { session } } = await supa.auth.getSession();
@@ -108,9 +134,10 @@
         document.getElementById('navLinks').classList.toggle('open');
       });
 
-      // Cargar sugerencias y lista abiertos
+      // Inicial
       await cargarSugerencias();
       await cargarAbiertos();
+      await cargarHistorial();
 
       // Abrir
       document.getElementById('btnAbrir').addEventListener('click', async ()=>{
@@ -120,9 +147,8 @@
         if(!placa){ toast('Ingresa la placa', false); return; }
         try{
           await ParkingAPI.crearTicket({ placa, tipoVehiculo:tipo, categoria:cat });
-          toast('Ticket abierto');
           document.getElementById('inPlaca').value='';
-          await cargarSugerencias(); await cargarAbiertos();
+          await cargarSugerencias(); await cargarAbiertos(); await cargarHistorial();
         }catch(e){ toast(e.message||String(e), false); }
       });
 
@@ -133,12 +159,14 @@
         if(!placa){ toast('Ingresa la placa para cerrar', false); return; }
         try{
           const total = await ParkingAPI.cerrarTicket({ placa, tipo_pago:pago });
-          document.getElementById('cerrarMsg').textContent = `Cobrado: ${Number(total).toFixed(2)} Bs`;
-          toast('Ticket cerrado');
+          document.getElementById('cerrarMsg').textContent = `Cobrado: ${fmt(total)} Bs`;
           document.getElementById('outPlaca').value='';
-          await cargarSugerencias(); await cargarAbiertos();
+          await cargarSugerencias(); await cargarAbiertos(); await cargarHistorial();
         }catch(e){ toast(e.message||String(e), false); }
       });
+
+      // Cambio de período historial
+      document.getElementById('periodo').addEventListener('change', cargarHistorial);
 
       async function cargarSugerencias(){
         const placas = await ParkingAPI.placasAbiertas();
@@ -157,7 +185,11 @@
             <td>${new Date(t.hora_entrada).toLocaleString()}</td>
             <td>${t.operador_id ? t.operador_id.slice(0,6)+'…' : '-'}</td>
             <td class="text-end">
-              ${isAdmin ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>` : ''}
+              ${
+                isAdmin
+                ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>`
+                : ''
+              }
             </td>
           </tr>
         `).join('') || `<tr><td colspan="6" class="text-muted">Sin abiertos</td></tr>`;
@@ -169,12 +201,29 @@
               if(!confirm('¿Cerrar este ticket manualmente?')) return;
               try{
                 await ParkingAPI.cerrarTicketManual(id);
-                toast('Cerrado manual');
-                await cargarSugerencias(); await cargarAbiertos();
+                await cargarSugerencias(); await cargarAbiertos(); await cargarHistorial();
               }catch(e){ toast(e.message||String(e), false); }
             });
           });
         }
+      }
+
+      async function cargarHistorial(){
+        const preset = document.getElementById('periodo').value;
+        const { startISO, endISO } = ParkingAPI.rango(preset);
+        const data = await ParkingAPI.historialPropio({ startISO, endISO });
+
+        const tb = document.getElementById('tbodyHistorial');
+        tb.innerHTML = (data||[]).map(t=>`
+          <tr>
+            <td class="mono">${t.placa_vehiculo}</td>
+            <td>${t.tipo_vehiculo}</td>
+            <td>${t.estado}</td>
+            <td>${t.hora_entrada ? new Date(t.hora_entrada).toLocaleString() : '-'}</td>
+            <td>${t.hora_salida  ? new Date(t.hora_salida ).toLocaleString() : '-'}</td>
+            <td class="text-end mono">${fmt(t.costo_total)}</td>
+          </tr>
+        `).join('') || `<tr><td colspan="6" class="text-muted">Sin tickets en el período</td></tr>`;
       }
     })();
   </script>

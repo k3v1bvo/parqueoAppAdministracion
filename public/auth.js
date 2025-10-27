@@ -41,28 +41,39 @@ function setCurrentUser(session){
 // ---------- Toast ----------
 function toast(msg, ok = true) {
   const t = document.getElementById('toast');
-  if (!t) { alert(msg); return; }
+  if (!t) { if(!ok) console.error(msg); alert(msg); return; }
   t.textContent = msg;
   t.className = 'toast ' + (ok ? 'ok' : 'err');
   t.style.display = 'block';
   setTimeout(() => t.style.display = 'none', 2200);
 }
 
+// ---------- Notificaciones nativas ----------
+async function notify(title, body){
+  try{
+    if(!('Notification' in window)) return;
+    if(Notification.permission === 'granted'){
+      new Notification(title, { body });
+    }else if(Notification.permission !== 'denied'){
+      const perm = await Notification.requestPermission();
+      if(perm === 'granted') new Notification(title, { body });
+    }
+  }catch(_){}
+}
+
 // ---------- API principal ----------
 const ParkingAPI = {
 
-  // Normaliza placa
   _placa(p) { return (p || '').toUpperCase().replace(/\s+/g, ''); },
 
-  // Crea ticket (entrada)
   async crearTicket({ placa, tipoVehiculo, categoria = 'normal' }) {
-    const { data: { user } } = await supa.auth.getUser();
+    const { data: { user} } = await supa.auth.getUser();
     const operador_id = user?.id;
     placa = this._placa(placa);
 
-    // Evitar duplicado abierto
-    const { data: ab } = await supa.from('tickets')
+    const { data: ab, error: e1 } = await supa.from('tickets')
       .select('id').eq('placa_vehiculo', placa).eq('estado', 'ingresado').limit(1);
+    if (e1) throw e1;
     if (ab?.length) throw new Error('Esa placa ya tiene un ticket abierto.');
 
     const { error } = await supa.from('tickets').insert([{
@@ -72,70 +83,70 @@ const ParkingAPI = {
       categoria
     }]);
     if (error) throw error;
+
+    toast('Ticket abierto');
+    notify('Ticket abierto', `Placa ${placa} (${tipoVehiculo})`);
     return true;
   },
 
-  // Calcula costo según reglas pedidas
   _calcularCosto(ticket, cierreDate) {
     const entrada = new Date(ticket.hora_entrada);
     const horaEntrada = entrada.getHours();
     const categoria = (ticket.categoria || 'normal').toLowerCase();
-
-    // NOCHE: desde 20:00 a 07:59 → tarifa fija 12 Bs
-    if (horaEntrada >= 20 || horaEntrada < 8) {
-      return 12;
-    }
-
-    // DÍA (08:00–19:59)
-    if (categoria === 'frecuente') return 12; // cliente frecuente
-    if (categoria === 'normal')  return 15;   // cliente normal
-
-    // Fallback (si crearan otros): por horas (primera 7, extra 1)
+    if (horaEntrada >= 20 || horaEntrada < 8) return 12;     // Noche
+    if (categoria === 'frecuente') return 12;                 // Día frecuente
+    if (categoria === 'normal')    return 15;                 // Día normal
     const ms = (cierreDate - entrada);
     const horas = Math.max(1, Math.ceil(ms / (1000 * 60 * 60)));
-    return 7 + (horas - 1) * 1;
+    return 7 + (horas - 1) * 1;                               // Fallback por horas
   },
 
-  // Cierra ticket por placa (empleado/admin)
   async cerrarTicket({ placa, tipo_pago = 'efectivo' }) {
+    const { data: { user } } = await supa.auth.getUser();
+    const uid = user?.id;
     placa = this._placa(placa);
     const now = new Date();
 
     const { data: tk, error } = await supa.from('tickets')
-      .select('*').eq('placa_vehiculo', placa).eq('estado', 'ingresado');
+      .select('*').eq('placa_vehiculo', placa).eq('estado', 'ingresado').limit(1);
     if (error) throw error;
     if (!tk?.length) throw new Error('No se encontró ticket abierto para esa placa.');
 
     const t = tk[0];
-    const total = this._calcularCosto(t, now);
 
+    const { data: { session } } = await supa.auth.getSession();
+    const isAdmin = (session?.user?.app_metadata?.role||'') === 'admin';
+    if(!isAdmin && t.operador_id !== uid){
+      throw new Error('Solo el admin puede cerrar tickets de otros operadores.');
+    }
+
+    const total = this._calcularCosto(t, now);
     const { error: upErr } = await supa.from('tickets').update({
       hora_salida: now.toISOString(),
       estado: 'pagado',
       costo_total: total,
       tipo_pago
     }).eq('id', t.id);
-
     if (upErr) throw upErr;
+
+    toast(`Ticket cerrado · ${total.toFixed(2)} Bs`);
+    notify('Ticket cerrado', `Placa ${placa} · ${total.toFixed(2)} Bs`);
     return total;
   },
 
-  // Cierre manual (solo admin) por ID
   async cerrarTicketManual(ticketId) {
-    const now = new Date();
-    // Podemos recalcular costo por reglas de día/noche si quieres;
-    // aquí dejamos 0 + anotación explícita.
     const { error } = await supa.from('tickets').update({
-      hora_salida: now.toISOString(),
+      hora_salida: new Date().toISOString(),
       estado: 'pagado',
       costo_total: 0,
       descripcion: 'Cerrado manualmente por admin'
     }).eq('id', ticketId);
     if (error) throw error;
+    toast('Ticket cerrado manualmente');
+    notify('Cierre manual', 'Ticket cerrado por administrador');
     return true;
   },
 
-  // Placas con ticket abierto (para autocompletar)
   async placasAbiertas() {
     const { data, error } = await supa.from('tickets')
       .select('placa_vehiculo').eq('estado', 'ingresado');
@@ -144,7 +155,6 @@ const ParkingAPI = {
     return Array.from(set).sort();
   },
 
-  // Tickets abiertos list (para tabla admin)
   async listarAbiertos() {
     const { data, error } = await supa
       .from('tickets')
@@ -155,23 +165,22 @@ const ParkingAPI = {
     return data || [];
   },
 
-  // --------- Planes (placa + plan + precio) ------------
+  async historialPropio({ startISO, endISO }) {
+    const { data: { user } } = await supa.auth.getUser();
+    const uid = user?.id;
+    const { data, error } = await supa.from('tickets')
+      .select('placa_vehiculo, tipo_vehiculo, estado, hora_entrada, hora_salida, costo_total')
+      .eq('operador_id', uid)
+      .gte('hora_entrada', startISO).lte('hora_entrada', endISO)
+      .order('hora_entrada', { ascending:false });
+    if (error) throw error;
+    return data || [];
+  },
+
   async crearPlan({ placa, tipoVehiculo, nombrePlan, precio }) {
     const { data: { user } } = await supa.auth.getUser();
     const operador_id = user?.id;
     placa = this._placa(placa);
-
-    // Se usa tabla vehiculos_planes (recomendada). Si no existiera en tu BD, crea con SQL:
-    // create table public.vehiculos_planes (
-    //   id uuid primary key default gen_random_uuid(),
-    //   placa text not null,
-    //   tipo_vehiculo text not null,
-    //   plan_nombre text not null,
-    //   precio numeric not null,
-    //   operador_id uuid references public.usuarios(id) on delete set null,
-    //   creado_at timestamptz default now()
-    // );
-
     const { error } = await supa.from('vehiculos_planes').insert([{
       placa,
       tipo_vehiculo: tipoVehiculo,
@@ -182,7 +191,6 @@ const ParkingAPI = {
     if (error) throw error;
     return true;
   },
-
   async listarPlanes() {
     const { data, error } = await supa.from('vehiculos_planes')
       .select('*').order('creado_at', { ascending: false });
@@ -190,7 +198,6 @@ const ParkingAPI = {
     return data || [];
   },
 
-  // --------- Tarifas ----------
   async listarTarifas() {
     const { data, error } = await supa.from('tarifas')
       .select('id,tipo_vehiculo,precio_primera_hora,precio_hora_extra')
@@ -198,7 +205,6 @@ const ParkingAPI = {
     if (error) throw error;
     return data || [];
   },
-
   async actualizarTarifa(id, primera, extra) {
     const { error } = await supa.from('tarifas').update({
       precio_primera_hora: Number(primera),
@@ -208,7 +214,6 @@ const ParkingAPI = {
     return true;
   },
 
-  // --------- Aux (rangos para otras vistas) ----------
   rango(preset) {
     const now = new Date();
     let start = new Date(now), end = new Date(now);
@@ -231,8 +236,8 @@ const ParkingAPI = {
   }
 };
 
-// Exponer helpers globales que otras vistas usan
 window.AuthUI = AuthUI;
 window.ParkingAPI = ParkingAPI;
 window.supa = supa;
 window.toast = toast;
+window.notify = notify;
