@@ -41,10 +41,7 @@
         <div class="card">
           <h2>➕ Abrir ticket (Entrada)</h2>
           <label class="form-label">Placa</label>
-          <div class="input-inline">
-            <input id="inPlaca" class="form-control" placeholder="Ej: ABC 123" autocomplete="off">
-            <span class="pill">Se normaliza: sin espacios y MAYÚSCULAS</span>
-          </div>
+          <input id="inPlaca" class="form-control" placeholder="Ej: ABC 123" autocomplete="off">
 
           <div class="row g-3 mt-2">
             <div class="col-6">
@@ -69,7 +66,6 @@
           </div>
 
           <button id="btnAbrir" class="btn btn-primary mt-3">Abrir ticket</button>
-          <p class="muted mt-2">🎯 Modalidad se guarda en el ticket (campo <em>categoria</em>) para calcular el costo al cerrar.</p>
         </div>
       </div>
 
@@ -96,7 +92,6 @@
           </div>
 
           <button id="btnCerrar" class="btn btn-blue mt-3">Cerrar ticket</button>
-          <p class="muted mt-2">🔎 Autocompleta con placas <strong>abiertas</strong>. Ignora espacios y mayúsculas/minúsculas.</p>
         </div>
       </div>
     </section>
@@ -106,15 +101,12 @@
       <h3>⏳ Tickets abiertos</h3>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
-          <thead>
-            <tr>
-              <th>Placa</th><th>Tipo</th><th>Modalidad</th><th>Entrada</th><th>Estado</th><th class="text-end">Acción</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Placa</th><th>Tipo</th><th>Modalidad</th><th>Entrada</th><th>Estado</th><th class="text-end">Acción</th>
+          </tr></thead>
           <tbody id="tbodyAbiertos"></tbody>
         </table>
       </div>
-      <p class="muted">Tip: como <strong>Admin</strong> puedes cerrar manualmente cualquier abierto.</p>
     </section>
   </main>
 
@@ -122,200 +114,107 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
-    let precios = {
-      diario_normal:15, diario_frecuente:12, noche:12, dia_y_noche_22:22, dia_y_noche_25:25,
-      p_primera:7, p_extra:1, corte_noche:'20:00'
-    };
-    let isAdmin = false, abiertosCache = [];
+  const precios = { diario_normal:15, diario_frecuente:12, noche:12, dia_y_noche_22:22, dia_y_noche_25:25, p_primera:7, p_extra:1, corte_noche:'20:00' };
+  let abiertos = [];
 
-    (async ()=>{
-      await AuthUI.requireLogin(); // empleado o admin
-      const u = await AuthUI.user();
-      isAdmin = (u?.role === 'admin');
+  // helpers
+  const fmt = n => Number(n||0).toFixed(2);
+  const normalizarPlaca = p => (p||'').toUpperCase().replace(/\s+/g,'').trim();
 
-      await cargarConfig();
-      await listarAbiertos();
+  // --- detectar plan activo por placa
+  async function getPlanActivo(placa){
+    const { data:veh } = await supa.from('vehiculos').select('id').eq('placa',placa).maybeSingle();
+    if(!veh) return null;
+    const { data:plan } = await supa.from('vehiculos_planes').select('*')
+      .eq('vehiculo_id',veh.id).eq('activo',true)
+      .order('desde',{ascending:false}).limit(1).maybeSingle();
+    return plan||null;
+  }
 
-      // Navbar móvil
-      document.getElementById('menuToggle').addEventListener('click', ()=>document.getElementById('navLinks').classList.toggle('open'));
-
-      // Autocompletar: refresca sugerencias
-      setInterval(refrescarDatalist, 5000);
-
-      // Previsualización de costo al escribir placa
-      document.getElementById('outPlaca').addEventListener('input', previewCosto);
-
-      document.getElementById('btnAbrir').addEventListener('click', abrirTicket);
-      document.getElementById('btnCerrar').addEventListener('click', cerrarTicket);
-    })();
-
-    async function cargarConfig(){
-      try{
-        const { data, error } = await supa.from('configuracion').select('clave,valor')
-          .in('clave', [
-            'precio_diario_normal','precio_diario_frecuente','precio_noche_plana',
-            'precio_dia_noche_22','precio_dia_noche_25',
-            'precio_primera_hora','precio_hora_extra','hora_corte_noche'
-          ]);
-        if(!error && data){
-          const m = Object.fromEntries(data.map(r=>[r.clave, r.valor]));
-          precios.diario_normal    = Number(m['precio_diario_normal']    ?? precios.diario_normal);
-          precios.diario_frecuente = Number(m['precio_diario_frecuente'] ?? precios.diario_frecuente);
-          precios.noche            = Number(m['precio_noche_plana']      ?? precios.noche);
-          precios.dia_y_noche_22   = Number(m['precio_dia_noche_22']     ?? precios.dia_y_noche_22);
-          precios.dia_y_noche_25   = Number(m['precio_dia_noche_25']     ?? precios.dia_y_noche_25);
-          precios.p_primera        = Number(m['precio_primera_hora']     ?? precios.p_primera);
-          precios.p_extra          = Number(m['precio_hora_extra']       ?? precios.p_extra);
-          precios.corte_noche      = String(m['hora_corte_noche']        ?? precios.corte_noche);
-        }
-      }catch(e){ console.warn(e); }
-      // pinta etiquetas del select
-      const lab = {
-        diario_normal:`Diario normal (${precios.diario_normal})`,
-        diario_frecuente:`Diario frecuente (${precios.diario_frecuente})`,
-        noche:`Noche (${precios.noche} hasta ${precios.corte_noche})`,
-        dia_y_noche_22:`Día + Noche (${precios.dia_y_noche_22})`,
-        dia_y_noche_25:`Día + Noche (${precios.dia_y_noche_25})`,
-      };
-      Array.from(document.querySelectorAll('#inCategoria option')).forEach(op=>{
-        if(lab[op.value]) op.textContent = lab[op.value];
-      });
+  function calcularCosto(t,salida,plan){
+    const e=new Date(t.hora_entrada);
+    const cat=t.categoria||'por_hora';
+    if(plan){
+      if(['diario_normal','diario_frecuente','noche','dia_y_noche_22','dia_y_noche_25'].includes(plan.plan))
+        return Number(plan.precio||0);
     }
-
-    function normalizarPlaca(p){ return (p||'').toUpperCase().replace(/\s+/g,'').trim(); }
-
-    async function abrirTicket(){
-      const placa = normalizarPlaca(document.getElementById('inPlaca').value);
-      const tipo  = document.getElementById('inTipo').value;
-      const cat   = document.getElementById('inCategoria').value;
-      if(!placa){ toast('Ingresa la placa', false); return; }
-      try{
-        // asegura vehiculo
-        let { data:veh } = await supa.from('vehiculos').select('id').eq('placa', placa).maybeSingle();
-        if(!veh){
-          const ins = await supa.from('vehiculos').insert({ placa }).select('id').single();
-          if(ins.error) throw ins.error; veh = ins.data;
-        }
-        // crea ticket
-        const { error } = await supa.from('tickets').insert({
-          placa_vehiculo: placa, tipo_vehiculo: tipo, descripcion: null,
-          categoria: cat, estado:'ingresado'
-        });
-        if(error) throw error;
-        toast('Ticket abierto');
-        document.getElementById('inPlaca').value='';
-        await listarAbiertos();
-      }catch(e){ toast(e.message||String(e), false); }
+    if(cat==='diario_normal')return precios.diario_normal;
+    if(cat==='diario_frecuente')return precios.diario_frecuente;
+    if(cat==='dia_y_noche_22')return precios.dia_y_noche_22;
+    if(cat==='dia_y_noche_25')return precios.dia_y_noche_25;
+    if(cat==='noche'){
+      const corte=new Date(e);const [hh,mm]=precios.corte_noche.split(':').map(Number);
+      corte.setHours(hh,mm||0,0,0);
+      if(salida<=corte)return precios.noche;
+      return precios.noche+calcularPorHora(corte,salida);
     }
+    return calcularPorHora(e,salida);
+  }
+  const calcularPorHora=(a,b)=>{const ms=Math.max(0,b-a);const h=Math.ceil(ms/36e5);return h<=1?precios.p_primera:precios.p_primera+(h-1)*precios.p_extra;}
 
-    async function cerrarTicket(){
-      const placaRaw = document.getElementById('outPlaca').value;
-      const placa = normalizarPlaca(placaRaw);
-      if(!placa){ toast('Escribe la placa', false); return; }
-      try{
-        // busca el ticket abierto más reciente para la placa
-        const { data:ticks, error } = await supa.from('tickets')
-          .select('*').eq('placa_vehiculo', placa).eq('estado','ingresado')
-          .order('hora_entrada', { ascending:false }).limit(1);
-        if(error) throw error;
-        if(!ticks || !ticks.length){ toast('No hay ticket abierto para esa placa', false); return; }
-        const t = ticks[0];
-        const salida = new Date();
-        const costo = calcularCosto(t, salida);
+  async function listarAbiertos(){
+    const {data,error}=await supa.from('tickets').select('*').eq('estado','ingresado').order('hora_entrada',{ascending:false});
+    if(error)return toast(error.message,false);
+    abiertos=data||[];
+    const tb=document.getElementById('tbodyAbiertos');
+    tb.innerHTML=abiertos.map(t=>`
+      <tr>
+        <td>${t.placa_vehiculo}</td>
+        <td>${t.tipo_vehiculo}</td>
+        <td>${t.categoria}</td>
+        <td>${new Date(t.hora_entrada).toLocaleString()}</td>
+        <td><span class="badge badge-open">Abierto</span></td>
+        <td class="text-end"><button class="btn btn-blue btn-sm" onclick="cerrarManual('${t.placa_vehiculo}')">Cerrar</button></td>
+      </tr>
+    `).join('') || `<tr><td colspan="6" class="muted">No hay tickets abiertos.</td></tr>`;
+    document.getElementById('listaPlacas').innerHTML = abiertos.map(x=>`<option value="${x.placa_vehiculo}">`).join('');
+  }
 
-        const pago = document.querySelector('input[name="pago"]:checked').value;
-        const { error:upErr } = await supa.from('tickets')
-          .update({ hora_salida: salida.toISOString(), costo_total: costo, estado:'pagado', tipo_pago: pago })
-          .eq('id', t.id);
-        if(upErr) throw upErr;
+  async function abrirTicket(){
+    const placa=normalizarPlaca(document.getElementById('inPlaca').value);
+    const tipo=document.getElementById('inTipo').value;
+    const catSel=document.getElementById('inCategoria');
+    let cat=catSel.value;
+    if(!placa)return toast('Ingresa placa',false);
+    const plan=await getPlanActivo(placa);
+    if(plan){cat=plan.plan;catSel.value=cat;catSel.disabled=true;}
+    let {data:veh}=await supa.from('vehiculos').select('id').eq('placa',placa).maybeSingle();
+    if(!veh){const ins=await supa.from('vehiculos').insert({placa}).select('id').single();veh=ins.data;}
+    const {error}=await supa.from('tickets').insert({placa_vehiculo:placa,tipo_vehiculo:tipo,categoria:cat,estado:'ingresado'});
+    if(error)return toast(error.message,false);
+    toast('Ticket abierto');
+    document.getElementById('inPlaca').value='';
+    catSel.disabled=false;
+    await listarAbiertos();
+  }
 
-        toast(`Ticket cerrado: Bs ${costo.toFixed(2)}`);
-        document.getElementById('outPlaca').value='';
-        document.getElementById('outPreview').value='0.00';
-        await listarAbiertos();
-      }catch(e){ toast(e.message||String(e), false); }
-    }
+  async function cerrarTicket(){
+    const placa=normalizarPlaca(document.getElementById('outPlaca').value);
+    if(!placa)return toast('Ingresa placa',false);
+    const {data}=await supa.from('tickets').select('*').eq('placa_vehiculo',placa).eq('estado','ingresado').limit(1);
+    if(!data.length)return toast('No hay abierto',false);
+    const t=data[0];const plan=await getPlanActivo(placa);
+    const costo=calcularCosto(t,new Date(),plan);
+    const pago=document.querySelector('input[name="pago"]:checked').value;
+    const {error}=await supa.from('tickets').update({estado:'pagado',hora_salida:new Date().toISOString(),costo_total:costo,tipo_pago:pago}).eq('id',t.id);
+    if(error)return toast(error.message,false);
+    toast('Cerrado Bs '+fmt(costo));
+    await listarAbiertos();
+  }
 
-    function calcularCosto(t, salidaDate){
-      const entrada = new Date(t.hora_entrada);
-      const cat = (t.categoria || 'por_hora');
-      if(cat === 'diario_normal')    return precios.diario_normal;
-      if(cat === 'diario_frecuente') return precios.diario_frecuente;
-      if(cat === 'dia_y_noche_22')   return precios.dia_y_noche_22;
-      if(cat === 'dia_y_noche_25')   return precios.dia_y_noche_25;
-      if(cat === 'noche'){
-        // si cierra antes de la hora de corte del MISMO día → tarifa plana
-        const corte = new Date(entrada);
-        const [hh,mm] = precios.corte_noche.split(':').map(Number);
-        corte.setHours(hh, mm||0, 0, 0);
-        if(salidaDate <= corte) return precios.noche;
-        // si pasa del corte: 12 + por_hora desde el corte
-        return precios.noche + calcularPorHora(corte, salidaDate);
-      }
-      // por hora
-      return calcularPorHora(entrada, salidaDate);
-    }
-    function calcularPorHora(desde, hasta){
-      const ms = Math.max(0, (hasta - desde));
-      const horas = Math.ceil(ms / (60*60*1000)); // redondeo hacia arriba
-      if(horas <= 1) return precios.p_primera;
-      return precios.p_primera + (horas - 1) * precios.p_extra;
-    }
+  function cerrarManual(p){
+    document.getElementById('outPlaca').value=p;
+    cerrarTicket();
+  }
 
-    async function listarAbiertos(){
-      const { data, error } = await supa.from('tickets')
-        .select('id,placa_vehiculo,tipo_vehiculo,categoria,hora_entrada,estado')
-        .eq('estado','ingresado').order('hora_entrada',{ascending:false});
-      if(error){ toast(error.message, false); return; }
-      abiertosCache = data || [];
-      const tb = document.getElementById('tbodyAbiertos');
-      tb.innerHTML = (abiertosCache).map(t => `
-        <tr>
-          <td class="mono">${t.placa_vehiculo}</td>
-          <td>${t.tipo_vehiculo}</td>
-          <td><span class="pill">${labelCat(t.categoria)}</span></td>
-          <td>${new Date(t.hora_entrada).toLocaleString()}</td>
-          <td><span class="badge badge-open">Abierto</span></td>
-          <td class="text-end">
-            <button class="btn btn-blue btn-sm" onclick="cerrarDesdeLista('${t.placa_vehiculo}')">Cerrar</button>
-          </td>
-        </tr>
-      `).join('') || `<tr><td colspan="6" class="muted">No hay tickets abiertos.</td></tr>`;
-      refrescarDatalist();
-    }
-
-    function labelCat(c){
-      const map = {
-        por_hora:'Por hora',
-        diario_normal:'Diario normal',
-        diario_frecuente:'Diario frecuente',
-        noche:'Noche',
-        dia_y_noche_22:'Día+Noche (22)',
-        dia_y_noche_25:'Día+Noche (25)'
-      };
-      return map[c] || '—';
-    }
-
-    function refrescarDatalist(){
-      const d = document.getElementById('listaPlacas');
-      const set = new Set(abiertosCache.map(x=>x.placa_vehiculo));
-      d.innerHTML = Array.from(set).map(p=>`<option value="${p}">`).join('');
-    }
-
-    async function previewCosto(){
-      const placa = normalizarPlaca(document.getElementById('outPlaca').value);
-      if(!placa){ document.getElementById('outPreview').value='0.00'; return; }
-      const t = abiertosCache.find(x => x.placa_vehiculo === placa);
-      if(!t){ document.getElementById('outPreview').value='0.00'; return; }
-      const c = calcularCosto(t, new Date());
-      document.getElementById('outPreview').value = c.toFixed(2);
-    }
-
-    function cerrarDesdeLista(placa){
-      document.getElementById('outPlaca').value = placa;
-      previewCosto();
-      document.getElementById('btnCerrar').focus();
-    }
+  async function init(){
+    await AuthUI.requireLogin();
+    document.getElementById('menuToggle').onclick=()=>document.getElementById('navLinks').classList.toggle('open');
+    document.getElementById('btnAbrir').onclick=abrirTicket;
+    document.getElementById('btnCerrar').onclick=cerrarTicket;
+    await listarAbiertos();
+  }
+  init();
   </script>
 </body>
 </html>
