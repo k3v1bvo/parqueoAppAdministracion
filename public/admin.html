@@ -8,13 +8,21 @@
   <div id="toast" class="toast"></div>
   <style>
     .cards{display:grid;gap:14px;grid-template-columns:1fr}
-    @media(min-width:992px){.cards{grid-template-columns:repeat(4,1fr)}}
+    @media(min-width:1200px){.cards{grid-template-columns:repeat(5,1fr)}}
     .card{background:#0b1220;border:1px solid #1f2937;border-radius:16px;padding:16px}
     .kpi{display:flex;align-items:center;gap:12px}
     .k-name{color:#9fb0c5;font-size:12px}
     .value{font-weight:800;font-size:22px}
     .mono{font-variant-numeric:tabular-nums}
     .table-wrap{overflow:auto}
+    .grid-2{display:grid;gap:16px}
+    @media(min-width:1200px){.grid-2{grid-template-columns:1fr 1fr}}
+    .grid-3{display:grid;gap:16px}
+    @media(min-width:1200px){.grid-3{grid-template-columns:1fr 1fr 1fr}}
+    .muted{color:#9fb0c5}
+    .badge{padding:4px 8px;border-radius:8px;background:#1f2937}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .hint{color:#9fb0c5;font-size:12px;margin-top:6px}
   </style>
 </head>
 <body>
@@ -33,9 +41,11 @@
   </nav>
 
   <main class="container">
+
+    <!-- Filtros -->
     <section class="card">
       <div class="row g-3">
-        <div class="col-12 col-lg-3">
+        <div class="col-12 col-xl-2">
           <label class="form-label">Período</label>
           <select id="periodo" class="form-select">
             <option value="daily">Hoy</option>
@@ -43,119 +53,362 @@
             <option value="monthly">Este mes</option>
             <option value="yearly">Este año</option>
             <option value="alltime">Todo</option>
+            <option value="custom">Personalizado</option>
           </select>
         </div>
-        <div class="col-12 col-lg-3 d-grid align-end">
+        <div class="col-12 col-md-5 col-xl-3">
+          <label class="form-label">Desde</label>
+          <input id="fechaDesde" type="datetime-local" class="form-control"/>
+        </div>
+        <div class="col-12 col-md-5 col-xl-3">
+          <label class="form-label">Hasta</label>
+          <input id="fechaHasta" type="datetime-local" class="form-control"/>
+        </div>
+        <div class="col-12 col-md-2 col-xl-2 d-grid align-end">
           <label class="form-label">&nbsp;</label>
           <button id="btnRefrescar" class="btn btn-primary">Refrescar</button>
         </div>
       </div>
+      <p class="hint">Si eliges “Personalizado”, usa los campos Desde/Hasta. Para otros períodos, se ignoran.</p>
     </section>
 
+    <!-- KPIs -->
     <section class="cards mt-3">
-      <div class="card kpi">
-        <div>
-          <div class="k-name">Tickets abiertos</div>
-          <div id="kpiAbiertos" class="value">0</div>
-        </div>
+      <div class="card kpi"><div><div class="k-name">Abiertos</div><div id="kpiAbiertos" class="value">0</div></div></div>
+      <div class="card kpi"><div><div class="k-name">Ing. tickets</div><div id="kpiIngT" class="value mono">0.00</div></div></div>
+      <div class="card kpi"><div><div class="k-name">Ing. extra</div><div id="kpiIngX" class="value mono">0.00</div></div></div>
+      <div class="card kpi"><div><div class="k-name">Egresos</div><div id="kpiEgr" class="value mono">0.00</div></div></div>
+      <div class="card kpi"><div><div class="k-name">NETO</div><div id="kpiNeto" class="value mono">0.00</div></div></div>
+    </section>
+
+    <!-- Gráficos -->
+    <section class="grid-3 mt-3">
+      <div class="card">
+        <h3>Por operador</h3>
+        <canvas id="chartOperador" height="180"></canvas>
       </div>
-      <div class="card kpi">
-        <div>
-          <div class="k-name">Ingresos por tickets</div>
-          <div id="kpiIngT" class="value mono">0.00</div>
-        </div>
+      <div class="card">
+        <h3>Serie diaria</h3>
+        <canvas id="chartDiario" height="180"></canvas>
       </div>
-      <div class="card kpi">
-        <div>
-          <div class="k-name">Ingresos extra</div>
-          <div id="kpiIngX" class="value mono">0.00</div>
-        </div>
-      </div>
-      <div class="card kpi">
-        <div>
-          <div class="k-name">Egresos</div>
-          <div id="kpiEgr" class="value mono">0.00</div>
-        </div>
+      <div class="card">
+        <h3>Método de pago</h3>
+        <canvas id="chartPago" height="180"></canvas>
       </div>
     </section>
 
+    <!-- Por operador (tabla) -->
     <section class="card mt-3">
-      <h3>Neto del período</h3>
-      <div id="kpiNeto" class="value mono">0.00</div>
-    </section>
-
-    <section class="card mt-3">
-      <h3>Por operador</h3>
+      <div class="actions">
+        <h3 style="margin:0">Detalle por operador</h3>
+        <span class="badge" id="badgeRango"></span>
+      </div>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
-          <thead><tr><th>Operador</th><th class="text-end">Tickets</th><th class="text-end">Monto Tickets</th><th class="text-end">Ingresos Extra</th></tr></thead>
-          <tbody id="tbodyOp"></tbody>
+          <thead>
+            <tr>
+              <th>Operador</th>
+              <th class="text-end">Tickets</th>
+              <th class="text-end">Monto tickets</th>
+              <th class="text-end">Ingresos extra</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyOperador"></tbody>
         </table>
       </div>
     </section>
 
+    <!-- Gestión de egresos -->
+    <section class="card mt-3">
+      <h3>Egresos (gastos)</h3>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <label class="form-label">Concepto</label>
+          <input id="egConcepto" class="form-control" placeholder="Ej: Compra de tickets, limpieza, etc."/>
+        </div>
+        <div class="col-12 col-lg-3">
+          <label class="form-label">Monto (Bs)</label>
+          <input id="egMonto" class="form-control" type="number" step="0.01" min="0" />
+        </div>
+        <div class="col-12 col-lg-3 d-grid align-end">
+          <label class="form-label">&nbsp;</label>
+          <button id="btnEgreso" class="btn btn-danger">Agregar egreso</button>
+        </div>
+      </div>
+      <p class="hint">Los egresos se restan del NETO del período seleccionado.</p>
+
+      <div class="table-wrap mt-3">
+        <table class="table table-dark table-borderless align-middle">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Concepto</th>
+              <th class="text-end">Monto</th>
+              <th class="text-end">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyEgresos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Pagos recientes -->
     <section class="card mt-3">
       <h3>Pagos recientes</h3>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
-          <thead><tr><th>Placa</th><th>Tipo</th><th>Entrada</th><th>Salida</th><th class="text-end">Total (Bs)</th></tr></thead>
-        <tbody id="tbodyRec"></tbody>
+          <thead><tr><th>Placa</th><th>Tipo</th><th>Pago</th><th>Entrada</th><th>Salida</th><th class="text-end">Total (Bs)</th></tr></thead>
+          <tbody id="tbodyRecientes"></tbody>
         </table>
       </div>
     </section>
+
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
     const N = (x)=> Number(x||0);
+    let chOp=null, chDia=null, chPay=null;
 
     (async ()=>{
       await AuthUI.requireAdmin();
 
+      // menu mobile
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
 
       document.getElementById('btnRefrescar').addEventListener('click', loadTodo);
-      document.getElementById('periodo').addEventListener('change', loadTodo);
+      document.getElementById('periodo').addEventListener('change', (e)=>{
+        const custom = e.target.value === 'custom';
+        document.getElementById('fechaDesde').disabled = !custom;
+        document.getElementById('fechaHasta').disabled = !custom;
+      });
+
+      // init disabled custom
+      document.getElementById('fechaDesde').disabled = true;
+      document.getElementById('fechaHasta').disabled = true;
 
       await loadTodo();
 
       async function loadTodo(){
+        let startISO, endISO;
         const preset = document.getElementById('periodo').value;
-        const { startISO, endISO } = ParkingAPI.rango(preset);
+        if(preset === 'custom'){
+          const d = document.getElementById('fechaDesde').value;
+          const h = document.getElementById('fechaHasta').value;
+          if(!d || !h){ toast('Selecciona Desde y Hasta', false); return; }
+          startISO = new Date(d).toISOString();
+          endISO   = new Date(h).toISOString();
+        }else{
+          ({ startISO, endISO } = ParkingAPI.rango(preset));
+          // para badge
+          if(preset !== 'alltime'){
+            const sd = new Date(startISO), ed = new Date(endISO);
+            document.getElementById('badgeRango').textContent =
+              sd.toLocaleDateString() + ' → ' + ed.toLocaleDateString();
+          }else{
+            document.getElementById('badgeRango').textContent = 'Todo';
+          }
+        }
 
-        const res = await ParkingAPI.adminResumenRango({ startISO, endISO });
+        // ========= Lee datos base =========
+        const [abiertos, tks, ex, eg, us] = await Promise.all([
+          supa.from('tickets').select('id').eq('estado','ingresado'),
+          supa.from('tickets').select('operador_id,costo_total,estado,hora_salida,tipo_pago,hora_entrada,placa_vehiculo,tipo_vehiculo')
+              .gte('hora_salida', startISO).lte('hora_salida', endISO).eq('estado','pagado'),
+          supa.from('ingresos_extra').select('operador_id,monto,creado_at')
+              .gte('creado_at', startISO).lte('creado_at', endISO),
+          supa.from('egresos_admin').select('id,concepto,monto,creado_at,admin_id')
+              .gte('creado_at', startISO).lte('creado_at', endISO),
+          supa.from('usuarios').select('id,nombre,rol')
+        ]);
 
-        document.getElementById('kpiAbiertos').textContent = res.abiertos;
-        document.getElementById('kpiIngT').textContent = N(res.ingresosTickets).toFixed(2);
-        document.getElementById('kpiIngX').textContent = N(res.ingresosExtra).toFixed(2);
-        document.getElementById('kpiEgr').textContent  = N(res.egresos).toFixed(2);
-        document.getElementById('kpiNeto').textContent = N(res.neto).toFixed(2);
+        const abiertosN = (abiertos.data||[]).length;
+        const tickets   = tks.data||[];
+        const extras    = ex.data||[];
+        const egresos   = eg.data||[];
+        const usuarios  = us.data||[];
 
-        const tbOp = document.getElementById('tbodyOp');
-        tbOp.innerHTML = (res.porOperador||[]).map(o=>`
+        // ========= KPIs =========
+        const sum = (arr,k)=> (arr||[]).reduce((a,b)=> a + N(b[k]), 0);
+        const ingT = sum(tickets,'costo_total');
+        const ingX = sum(extras,'monto');
+        const egr  = sum(egresos,'monto');
+        const neto = ingT + ingX - egr;
+
+        document.getElementById('kpiAbiertos').textContent = abiertosN;
+        document.getElementById('kpiIngT').textContent = ingT.toFixed(2);
+        document.getElementById('kpiIngX').textContent = ingX.toFixed(2);
+        document.getElementById('kpiEgr').textContent  = egr.toFixed(2);
+        document.getElementById('kpiNeto').textContent = neto.toFixed(2);
+
+        // ========= Por operador (tabla + chart) =========
+        const name = (id)=> (usuarios.find(u=>u.id===id)?.nombre) || (id ? id.slice(0,6)+'…' : '—');
+
+        const porOp = {};
+        tickets.forEach(t=>{
+          const k = t.operador_id||'—';
+          porOp[k] ??= { nombre: name(k), tickets:0, monto:0, extra:0 };
+          porOp[k].tickets += 1;
+          porOp[k].monto   += N(t.costo_total);
+        });
+        extras.forEach(x=>{
+          const k = x.operador_id||'—';
+          porOp[k] ??= { nombre: name(k), tickets:0, monto:0, extra:0 };
+          porOp[k].extra += N(x.monto);
+        });
+
+        const porOpArr = Object.values(porOp).sort((a,b)=> (b.monto+b.extra)-(a.monto+a.extra));
+        const tbOp = document.getElementById('tbodyOperador');
+        tbOp.innerHTML = porOpArr.map(o=>`
           <tr>
-            <td>${o.nombre||'—'}</td>
-            <td class="text-end mono">${o.tickets||0}</td>
-            <td class="text-end mono">${N(o.monto).toFixed(2)}</td>
-            <td class="text-end mono">${N(o.extra||0).toFixed(2)}</td>
+            <td>${o.nombre}</td>
+            <td class="text-end mono">${o.tickets}</td>
+            <td class="text-end mono">${o.monto.toFixed(2)}</td>
+            <td class="text-end mono">${(o.extra||0).toFixed(2)}</td>
           </tr>
         `).join('') || `<tr><td colspan="4" class="text-muted">Sin datos</td></tr>`;
 
-        const tbR = document.getElementById('tbodyRec');
-        tbR.innerHTML = (res.recientes||[]).map(t=>`
+        drawBarOperador(porOpArr);
+
+        // ========= Serie diaria (tickets, extra, egresos, neto) =========
+        const keyDay = (d)=> {
+          const dt = new Date(d);
+          dt.setHours(0,0,0,0);
+          return dt.toISOString().slice(0,10); // YYYY-MM-DD
+        };
+        const series = {};
+        tickets.forEach(t=>{
+          const k = keyDay(t.hora_salida);
+          (series[k] ||= {t:0,x:0,e:0,n:0});
+          series[k].t += N(t.costo_total);
+        });
+        extras.forEach(r=>{
+          const k = keyDay(r.creado_at);
+          (series[k] ||= {t:0,x:0,e:0,n:0});
+          series[k].x += N(r.monto);
+        });
+        egresos.forEach(g=>{
+          const k = keyDay(g.creado_at);
+          (series[k] ||= {t:0,x:0,e:0,n:0});
+          series[k].e += N(g.monto);
+        });
+        const labels = Object.keys(series).sort();
+        const dT = labels.map(k=>series[k].t);
+        const dX = labels.map(k=>series[k].x);
+        const dE = labels.map(k=>series[k].e);
+        const dN = labels.map((k,i)=> dT[i] + dX[i] - dE[i]);
+
+        drawLineDiario(labels, dT, dX, dE, dN);
+
+        // ========= Pie método de pago =========
+        const payCount = tickets.reduce((m,t)=>{
+          const k = (t.tipo_pago||'efectivo').toLowerCase();
+          m[k] = (m[k]||0) + 1;
+          return m;
+        }, {});
+        drawPiePago(['efectivo','qr'], [payCount['efectivo']||0, payCount['qr']||0]);
+
+        // ========= Egresos tabla (con eliminar) =========
+        const tbe = document.getElementById('tbodyEgresos');
+        tbe.innerHTML = egresos
+          .sort((a,b)=> new Date(b.creado_at) - new Date(a.creado_at))
+          .map(g=>`
+            <tr>
+              <td>${new Date(g.creado_at).toLocaleString()}</td>
+              <td>${g.concepto}</td>
+              <td class="text-end mono">${N(g.monto).toFixed(2)}</td>
+              <td class="text-end"><button class="btn btn-sm btn-danger" data-del="${g.id}">Eliminar</button></td>
+            </tr>
+          `).join('') || `<tr><td colspan="4" class="text-muted">Sin egresos</td></tr>`;
+
+        tbe.querySelectorAll('button[data-del]').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            const id = btn.getAttribute('data-del');
+            if(!confirm('¿Eliminar este egreso?')) return;
+            const { error } = await supa.from('egresos_admin').delete().eq('id', id);
+            if(error){ toast(error.message||'No se pudo eliminar', false); return; }
+            toast('Egreso eliminado');
+            await loadTodo();
+          });
+        });
+
+        // ========= Pagos recientes =========
+        const tbR = document.getElementById('tbodyRecientes');
+        const recientes = tickets
+          .slice()
+          .sort((a,b)=> new Date(b.hora_salida) - new Date(a.hora_salida))
+          .slice(0,20);
+        tbR.innerHTML = recientes.map(t=>`
           <tr>
             <td class="mono">${t.placa_vehiculo}</td>
             <td>${t.tipo_vehiculo}</td>
+            <td>${(t.tipo_pago||'-').toUpperCase()}</td>
             <td>${t.hora_entrada ? new Date(t.hora_entrada).toLocaleString() : '-'}</td>
             <td>${t.hora_salida  ? new Date(t.hora_salida ).toLocaleString() : '-'}</td>
             <td class="text-end mono">${N(t.costo_total).toFixed(2)}</td>
           </tr>
-        `).join('') || `<tr><td colspan="5" class="text-muted">Sin pagos en el período</td></tr>`;
+        `).join('') || `<tr><td colspan="6" class="text-muted">Sin pagos en el período</td></tr>`;
       }
+
+      // Agregar egreso
+      document.getElementById('btnEgreso').addEventListener('click', async ()=>{
+        const concepto = document.getElementById('egConcepto').value.trim();
+        const monto = Number(document.getElementById('egMonto').value);
+        if(!concepto || !(monto>=0)){ toast('Completa concepto y monto válido', false); return; }
+        const { data:{ user } } = await supa.auth.getUser();
+        const admin_id = user?.id;
+        const { error } = await supa.from('egresos_admin').insert([{ concepto, monto, admin_id }]);
+        if(error){ toast(error.message||'No se pudo guardar', false); return; }
+        document.getElementById('egConcepto').value='';
+        document.getElementById('egMonto').value='';
+        toast('Egreso agregado');
+        document.getElementById('btnRefrescar').click();
+      });
+
+      // ======= Charts helpers =======
+      function drawBarOperador(rows){
+        const labels = rows.map(r=>r.nombre);
+        const data = rows.map(r=> (r.monto + (r.extra||0)));
+        if(chOp) chOp.destroy();
+        const ctx = document.getElementById('chartOperador');
+        chOp = new Chart(ctx, {
+          type: 'bar',
+          data: { labels, datasets: [{ label:'Total por operador (Bs)', data }] },
+          options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}}}
+        });
+      }
+      function drawLineDiario(labels, t, x, e, n){
+        if(chDia) chDia.destroy();
+        const ctx = document.getElementById('chartDiario');
+        chDia = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label:'Tickets', data:t },
+              { label:'Extras',  data:x },
+              { label:'Egresos', data:e },
+              { label:'Neto',    data:n }
+            ]
+          },
+          options: { responsive:true, plugins:{ legend:{ position:'bottom' }}, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}}}
+        });
+      }
+      function drawPiePago(labels, data){
+        if(chPay) chPay.destroy();
+        const ctx = document.getElementById('chartPago');
+        chPay = new Chart(ctx, {
+          type: 'pie',
+          data: { labels, datasets: [{ data }] },
+          options: { responsive:true, plugins:{ legend:{ position:'bottom' }} }
+        });
+      }
+
     })();
   </script>
 </body>

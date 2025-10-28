@@ -15,9 +15,9 @@
     .badge{padding:4px 8px;border-radius:8px;background:#065f46}
     .admin-badge{display:none}
     body.admin .admin-badge{display:inline-block}
-    datalist option{color:#000}
     .filters{display:grid;gap:10px;grid-template-columns:1fr}
     @media(min-width:992px){.filters{grid-template-columns:180px 1fr}}
+    .muted{color:#9fb0c5}
   </style>
 </head>
 <body>
@@ -66,14 +66,27 @@
       <!-- Cerrar -->
       <section class="card">
         <h2>✅ Cerrar ticket (Salida)</h2>
-        <label class="form-label">Placa (sugerencias de abiertas)</label>
-        <input id="outPlaca" list="opcPlacas" class="form-control" placeholder="Empieza a escribir..." />
-        <datalist id="opcPlacas"></datalist>
 
-        <label class="form-label mt-2">Tipo de pago</label>
-        <div class="row">
-          <div class="col-6"><label><input type="radio" name="pago" value="efectivo" checked /> Efectivo</label></div>
-          <div class="col-6"><label><input type="radio" name="pago" value="qr" /> QR</label></div>
+        <!-- NUEVO: Buscador + Combo -->
+        <label class="form-label">Buscar placa (filtro)</label>
+        <input id="fltPlaca" class="form-control" placeholder="Escribe para filtrar…" />
+
+        <label class="form-label mt-2">Placas con ticket abierto</label>
+        <select id="selPlaca" class="form-select"></select>
+        <div class="muted mt-1" id="selInfo"></div>
+
+        <div class="row mt-3">
+          <div class="col-6">
+            <label class="form-label">Tipo de pago</label>
+            <div class="row">
+              <div class="col-6"><label><input type="radio" name="pago" value="efectivo" checked /> Efectivo</label></div>
+              <div class="col-6"><label><input type="radio" name="pago" value="qr" /> QR</label></div>
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">O bien, escribir placa (opcional)</label>
+            <input id="outPlaca" class="form-control" placeholder="ABC 123" />
+          </div>
         </div>
 
         <button id="btnCerrar" class="btn btn-success mt-3">Cerrar ticket</button>
@@ -129,14 +142,21 @@
       const isAdmin = (session?.user?.app_metadata?.role||'') === 'admin';
       if(isAdmin) document.body.classList.add('admin');
 
+      // Menu mobile
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
 
-      await cargarSugerencias();
-      await cargarAbiertos();
-      await cargarHistorial();
+      // Inicial
+      await recargarTodo();
 
+      // Auto-refresco cada 20s (combo + tabla de abiertos)
+      setInterval(async ()=>{ 
+        await cargarSugerencias(); 
+        await cargarAbiertos();
+      }, 20000);
+
+      // Abrir
       document.getElementById('btnAbrir').addEventListener('click', async ()=>{
         const placa = document.getElementById('inPlaca').value.trim();
         const tipo  = document.getElementById('inTipo').value;
@@ -145,33 +165,66 @@
         try{
           await ParkingAPI.crearTicket({ placa, tipoVehiculo:tipo, categoria:cat });
           document.getElementById('inPlaca').value='';
-          await cargarSugerencias(); await cargarAbiertos(); await cargarHistorial();
+          await recargarTodo();
         }catch(e){ toast(e.message||String(e), false); }
       });
 
+      // Cerrar usando combo o input manual
       document.getElementById('btnCerrar').addEventListener('click', async ()=>{
-        const placa = document.getElementById('outPlaca').value.trim();
+        let placa = document.getElementById('outPlaca').value.trim();
+        const selVal = document.getElementById('selPlaca').value;
+        if(!placa && selVal) placa = selVal; // prioriza selección si no hay manual
         const pago = document.querySelector('input[name="pago"]:checked').value;
-        if(!placa){ toast('Ingresa la placa para cerrar', false); return; }
+
+        if(!placa){ toast('Selecciona una placa del combo o escribe una.', false); return; }
         try{
           const total = await ParkingAPI.cerrarTicket({ placa, tipo_pago:pago });
           document.getElementById('cerrarMsg').textContent = `Cobrado: ${fmt(total)} Bs`;
           document.getElementById('outPlaca').value='';
-          await cargarSugerencias(); await cargarAbiertos(); await cargarHistorial();
+          document.getElementById('selPlaca').value='';
+          document.getElementById('fltPlaca').value='';
+          await recargarTodo();
         }catch(e){ toast(e.message||String(e), false); }
       });
 
+      // Filtro del combo
+      document.getElementById('fltPlaca').addEventListener('input', filtrarCombo);
+
       document.getElementById('periodo').addEventListener('change', cargarHistorial);
 
-      async function cargarSugerencias(){
-        const placas = await ParkingAPI.placasAbiertas();
-        const dl = document.getElementById('opcPlacas');
-        dl.innerHTML = placas.map(p=>`<option value="${p}">`).join('');
+      async function recargarTodo(){
+        await cargarSugerencias();
+        await cargarAbiertos();
+        await cargarHistorial();
       }
 
+      // --- Combo de placas abiertas ---
+      let _placasCache = [];
+      async function cargarSugerencias(){
+        const placas = await ParkingAPI.placasAbiertas(); // ya vienen únicas
+        _placasCache = placas || [];
+        renderCombo(_placasCache);
+      }
+      function renderCombo(list){
+        const sel = document.getElementById('selPlaca');
+        sel.innerHTML = list.map(p=>`<option value="${p}">${p}</option>`).join('');
+        document.getElementById('selInfo').textContent = list.length
+          ? `${list.length} placas abiertas`
+          : 'No hay placas con ticket abierto';
+      }
+      function filtrarCombo(){
+        const q = document.getElementById('fltPlaca').value.trim().toUpperCase().replace(/\s+/g,'');
+        if(!q){ renderCombo(_placasCache); return; }
+        const filtradas = _placasCache.filter(p => p.includes(q));
+        renderCombo(filtradas);
+      }
+
+      // --- Tabla de abiertos ---
       async function cargarAbiertos(){
         const list = await ParkingAPI.listarAbiertos();
         const tb = document.getElementById('tbodyAbiertos');
+        const isAdmin = document.body.classList.contains('admin');
+
         tb.innerHTML = (list||[]).map(t => `
           <tr>
             <td class="mono">${t.placa_vehiculo}</td>
@@ -180,25 +233,26 @@
             <td>${new Date(t.hora_entrada).toLocaleString()}</td>
             <td>${t.operador_id ? t.operador_id.slice(0,6)+'…' : '-'}</td>
             <td class="text-end">
-              ${document.body.classList.contains('admin') ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>` : ''}
+              ${isAdmin ? `<button class="btn btn-danger btn-sm" data-id="${t.id}">Cerrar manual</button>` : ''}
             </td>
           </tr>
         `).join('') || `<tr><td colspan="6" class="text-muted">Sin abiertos</td></tr>`;
 
-        if(document.body.classList.contains('admin')){
+        if(isAdmin){
           tb.querySelectorAll('button[data-id]').forEach(btn=>{
             btn.addEventListener('click', async ()=>{
               const id = btn.getAttribute('data-id');
               if(!confirm('¿Cerrar este ticket manualmente?')) return;
               try{
                 await ParkingAPI.cerrarTicketManual(id);
-                await cargarSugerencias(); await cargarAbiertos(); await cargarHistorial();
+                await recargarTodo();
               }catch(e){ toast(e.message||String(e), false); }
             });
           });
         }
       }
 
+      // --- Historial propio ---
       async function cargarHistorial(){
         const preset = document.getElementById('periodo').value;
         const { startISO, endISO } = ParkingAPI.rango(preset);
@@ -218,7 +272,5 @@
       }
     })();
   </script>
-
-  <datalist id="opcPlacas"></datalist>
 </body>
 </html>
