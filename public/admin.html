@@ -19,10 +19,9 @@
     @media(min-width:1200px){.grid-2{grid-template-columns:1fr 1fr}}
     .grid-3{display:grid;gap:16px}
     @media(min-width:1200px){.grid-3{grid-template-columns:1fr 1fr 1fr}}
-    .muted{color:#9fb0c5}
-    .badge{padding:4px 8px;border-radius:8px;background:#1f2937}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}
     .hint{color:#9fb0c5;font-size:12px;margin-top:6px}
+    .badge{padding:4px 8px;border-radius:8px;background:#1f2937}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   </style>
 </head>
 <body>
@@ -41,7 +40,6 @@
   </nav>
 
   <main class="container">
-
     <!-- Filtros -->
     <section class="card">
       <div class="row g-3">
@@ -69,7 +67,7 @@
           <button id="btnRefrescar" class="btn btn-primary">Refrescar</button>
         </div>
       </div>
-      <p class="hint">Si eliges “Personalizado”, usa los campos Desde/Hasta. Para otros períodos, se ignoran.</p>
+      <p class="hint">“Personalizado” usa Desde/Hasta. Para otros períodos se ignoran.</p>
     </section>
 
     <!-- KPIs -->
@@ -97,12 +95,45 @@
       </div>
     </section>
 
-    <!-- Por operador (tabla) -->
+    <!-- Extracto (estado de cuenta) -->
     <section class="card mt-3">
       <div class="actions">
-        <h3 style="margin:0">Detalle por operador</h3>
+        <h3 style="margin:0">Extracto de caja</h3>
         <span class="badge" id="badgeRango"></span>
       </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-3">
+          <label class="form-label">Saldo inicial (Bs)</label>
+          <input id="saldoInicial" class="form-control mono" type="number" step="0.01" min="0" value="0" />
+        </div>
+        <div class="col-12 col-lg-3 d-grid align-end">
+          <label class="form-label">&nbsp;</label>
+          <button id="btnGuardarSaldo" class="btn btn-secondary">Guardar saldo</button>
+        </div>
+      </div>
+      <p class="hint">El extracto acumula: <code>saldo inicial + tickets pagados + extras − egresos</code> en el rango.</p>
+
+      <div class="grid-2 mt-3">
+        <div class="card">
+          <h4>Evolución del saldo</h4>
+          <canvas id="chartSaldo" height="160"></canvas>
+        </div>
+        <div class="card">
+          <h4>Transacciones</h4>
+          <div class="table-wrap">
+            <table class="table table-dark table-borderless align-middle">
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="text-end">Monto</th><th class="text-end">Saldo</th></tr></thead>
+              <tbody id="tbodyExtracto"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Por operador (tabla) -->
+    <section class="card mt-3">
+      <h3>Detalle por operador</h3>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
           <thead>
@@ -124,7 +155,7 @@
       <div class="row g-3">
         <div class="col-12 col-lg-6">
           <label class="form-label">Concepto</label>
-          <input id="egConcepto" class="form-control" placeholder="Ej: Compra de tickets, limpieza, etc."/>
+          <input id="egConcepto" class="form-control" placeholder="Ej: tickets, limpieza, etc."/>
         </div>
         <div class="col-12 col-lg-3">
           <label class="form-label">Monto (Bs)</label>
@@ -135,7 +166,6 @@
           <button id="btnEgreso" class="btn btn-danger">Agregar egreso</button>
         </div>
       </div>
-      <p class="hint">Los egresos se restan del NETO del período seleccionado.</p>
 
       <div class="table-wrap mt-3">
         <table class="table table-dark table-borderless align-middle">
@@ -149,6 +179,25 @@
           </thead>
           <tbody id="tbodyEgresos"></tbody>
         </table>
+      </div>
+      <p class="hint">Si “ayer” no aparece, revisa el período arriba (Hoy/Semana/Mes/Personalizado).</p>
+    </section>
+
+    <!-- Egresos por mes -->
+    <section class="card mt-3">
+      <h3>Histórico mensual de egresos</h3>
+      <div class="grid-2">
+        <div class="card">
+          <canvas id="chartEgresosMes" height="160"></canvas>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="table table-dark table-borderless align-middle">
+              <thead><tr><th>Mes</th><th class="text-end">Total (Bs)</th></tr></thead>
+              <tbody id="tbodyEgresosMes"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -171,28 +220,67 @@
   <script src="auth.js"></script>
   <script>
     const N = (x)=> Number(x||0);
-    let chOp=null, chDia=null, chPay=null;
+    let chOp=null, chDia=null, chPay=null, chSaldo=null, chEgMes=null;
 
     (async ()=>{
       await AuthUI.requireAdmin();
 
-      // menu mobile
       document.getElementById('menuToggle').addEventListener('click', ()=>{
         document.getElementById('navLinks').classList.toggle('open');
       });
-
       document.getElementById('btnRefrescar').addEventListener('click', loadTodo);
       document.getElementById('periodo').addEventListener('change', (e)=>{
         const custom = e.target.value === 'custom';
         document.getElementById('fechaDesde').disabled = !custom;
         document.getElementById('fechaHasta').disabled = !custom;
       });
+      document.getElementById('btnEgreso').addEventListener('click', agregarEgreso);
+      document.getElementById('btnGuardarSaldo').addEventListener('click', guardarSaldo);
 
-      // init disabled custom
+      // init custom disabled
       document.getElementById('fechaDesde').disabled = true;
       document.getElementById('fechaHasta').disabled = true;
 
+      // Cargar saldo inicial guardado si existe (auth.js nuevo) o 0 si no
+      try{
+        if(ParkingAPI.getSaldoInicial){
+          const si = await ParkingAPI.getSaldoInicial();
+          document.getElementById('saldoInicial').value = Number(si||0).toFixed(2);
+        }
+      }catch(_){}
+
       await loadTodo();
+
+      async function guardarSaldo(){
+        const v = Number(document.getElementById('saldoInicial').value||0);
+        try{
+          if(ParkingAPI.setSaldoInicial){
+            await ParkingAPI.setSaldoInicial(v);
+            toast('Saldo inicial guardado');
+            await loadTodo();
+          }else{
+            toast('Actualiza auth.js para guardar saldo inicial', false);
+          }
+        }catch(e){ toast(e.message||'No se pudo guardar', false); }
+      }
+
+      async function agregarEgreso(){
+        const concepto = document.getElementById('egConcepto').value.trim();
+        const monto = Number(document.getElementById('egMonto').value);
+        if(!concepto || !(monto>=0)){ toast('Completa concepto y monto válido', false); return; }
+        const { data:{ user } } = await supa.auth.getUser();
+        const admin_id = user?.id;
+        const { error } = await supa.from('egresos_admin').insert([{ concepto, monto, admin_id }]);
+        if(error){ toast(error.message||'No se pudo guardar', false); return; }
+        document.getElementById('egConcepto').value='';
+        document.getElementById('egMonto').value='';
+        toast('Egreso agregado');
+        await loadTodo();
+      }
+
+      function destroyIfExists(ref){
+        if(ref && typeof ref.destroy === 'function'){ ref.destroy(); }
+      }
 
       async function loadTodo(){
         let startISO, endISO;
@@ -203,41 +291,55 @@
           if(!d || !h){ toast('Selecciona Desde y Hasta', false); return; }
           startISO = new Date(d).toISOString();
           endISO   = new Date(h).toISOString();
+          document.getElementById('badgeRango').textContent = new Date(d).toLocaleString() + ' → ' + new Date(h).toLocaleString();
         }else{
           ({ startISO, endISO } = ParkingAPI.rango(preset));
-          // para badge
           if(preset !== 'alltime'){
             const sd = new Date(startISO), ed = new Date(endISO);
-            document.getElementById('badgeRango').textContent =
-              sd.toLocaleDateString() + ' → ' + ed.toLocaleDateString();
+            document.getElementById('badgeRango').textContent = sd.toLocaleDateString() + ' → ' + ed.toLocaleDateString();
           }else{
             document.getElementById('badgeRango').textContent = 'Todo';
           }
         }
 
-        // ========= Lee datos base =========
-        const [abiertos, tks, ex, eg, us] = await Promise.all([
-          supa.from('tickets').select('id').eq('estado','ingresado'),
-          supa.from('tickets').select('operador_id,costo_total,estado,hora_salida,tipo_pago,hora_entrada,placa_vehiculo,tipo_vehiculo')
-              .gte('hora_salida', startISO).lte('hora_salida', endISO).eq('estado','pagado'),
-          supa.from('ingresos_extra').select('operador_id,monto,creado_at')
-              .gte('creado_at', startISO).lte('creado_at', endISO),
-          supa.from('egresos_admin').select('id,concepto,monto,creado_at,admin_id')
-              .gte('creado_at', startISO).lte('creado_at', endISO),
-          supa.from('usuarios').select('id,nombre,rol')
-        ]);
+        // --------- LECTURAS BASE (con compatibilidad) ---------
+        let resumen;
+        try{
+          resumen = await ParkingAPI.adminResumenRango({ startISO, endISO });
+        }catch(e){
+          console.error('adminResumenRango falló:', e);
+          resumen = {};
+        }
 
-        const abiertosN = (abiertos.data||[]).length;
-        const tickets   = tks.data||[];
-        const extras    = ex.data||[];
-        const egresos   = eg.data||[];
-        const usuarios  = us.data||[];
+        const abiertosN = Number(resumen.abiertos||0);
+        // si el auth.js viejo no trae extras/egresos como arrays, los pedimos aquí
+        let extrasArr = Array.isArray(resumen.extras) ? resumen.extras : [];
+        let egresosArr = Array.isArray(resumen.egresos) ? resumen.egresos : [];
 
-        // ========= KPIs =========
+        if(!extrasArr.length){
+          const ex = await supa.from('ingresos_extra')
+            .select('operador_id,monto,creado_at')
+            .gte('creado_at', startISO).lte('creado_at', endISO);
+          extrasArr = ex.data || [];
+        }
+        if(!egresosArr.length){
+          const eg = await supa.from('egresos_admin')
+            .select('id,concepto,monto,creado_at,admin_id')
+            .gte('creado_at', startISO).lte('creado_at', endISO);
+          egresosArr = eg.data || [];
+        }
+
+        // tickets pagados completos para gráficos/tablas
+        const allPaidQ  = await supa.from('tickets')
+          .select('placa_vehiculo,tipo_vehiculo,hora_entrada,hora_salida,costo_total,tipo_pago,operador_id', { count:'exact' })
+          .gte('hora_salida', startISO).lte('hora_salida', endISO).eq('estado','pagado');
+        const allPaid = allPaidQ.data || [];
+
+        // KPIs
         const sum = (arr,k)=> (arr||[]).reduce((a,b)=> a + N(b[k]), 0);
-        const ingT = sum(tickets,'costo_total');
-        const ingX = sum(extras,'monto');
-        const egr  = sum(egresos,'monto');
+        const ingT = N(resumen.ingresosTickets ?? sum(allPaid,'costo_total'));
+        const ingX = N(resumen.ingresosExtra   ?? sum(extrasArr,'monto'));
+        const egr  = N(resumen.egresos        ?? sum(egresosArr,'monto'));
         const neto = ingT + ingX - egr;
 
         document.getElementById('kpiAbiertos').textContent = abiertosN;
@@ -246,53 +348,72 @@
         document.getElementById('kpiEgr').textContent  = egr.toFixed(2);
         document.getElementById('kpiNeto').textContent = neto.toFixed(2);
 
-        // ========= Por operador (tabla + chart) =========
-        const name = (id)=> (usuarios.find(u=>u.id===id)?.nombre) || (id ? id.slice(0,6)+'…' : '—');
+        // --------- Por operador (tabla + chart) ---------
+        // si el resumen ya trae porOperador, úsalo; si no, lo calculamos
+        let porOpArr = Array.isArray(resumen.porOperador) ? resumen.porOperador : null;
+        if(!porOpArr){
+          const us = await supa.from('usuarios').select('id,nombre');
+          const usuarios = us.data || [];
+          const name = (id)=> (usuarios.find(u=>u.id===id)?.nombre) || (id ? id.slice(0,6)+'…' : '—');
 
-        const porOp = {};
-        tickets.forEach(t=>{
-          const k = t.operador_id||'—';
-          porOp[k] ??= { nombre: name(k), tickets:0, monto:0, extra:0 };
-          porOp[k].tickets += 1;
-          porOp[k].monto   += N(t.costo_total);
-        });
-        extras.forEach(x=>{
-          const k = x.operador_id||'—';
-          porOp[k] ??= { nombre: name(k), tickets:0, monto:0, extra:0 };
-          porOp[k].extra += N(x.monto);
-        });
+          const porOp = {};
+          (allPaid||[]).forEach(t=>{
+            const k = t.operador_id||'—';
+            porOp[k] ??= { nombre:name(k), tickets:0, monto:0, extra:0 };
+            porOp[k].tickets += 1;
+            porOp[k].monto   += N(t.costo_total);
+          });
+          (extrasArr||[]).forEach(x=>{
+            const k = x.operador_id||'—';
+            porOp[k] ??= { nombre:name(k), tickets:0, monto:0, extra:0 };
+            porOp[k].extra += N(x.monto);
+          });
+          porOpArr = Object.values(porOp).sort((a,b)=> (b.monto+(b.extra||0))-(a.monto+(a.extra||0)));
+        }
 
-        const porOpArr = Object.values(porOp).sort((a,b)=> (b.monto+b.extra)-(a.monto+a.extra));
         const tbOp = document.getElementById('tbodyOperador');
-        tbOp.innerHTML = porOpArr.map(o=>`
+        tbOp.innerHTML = (porOpArr||[]).map(o=>`
           <tr>
-            <td>${o.nombre}</td>
-            <td class="text-end mono">${o.tickets}</td>
-            <td class="text-end mono">${o.monto.toFixed(2)}</td>
-            <td class="text-end mono">${(o.extra||0).toFixed(2)}</td>
+            <td>${o.nombre||'—'}</td>
+            <td class="text-end mono">${o.tickets||0}</td>
+            <td class="text-end mono">${N(o.monto).toFixed(2)}</td>
+            <td class="text-end mono">${N(o.extra||0).toFixed(2)}</td>
           </tr>
         `).join('') || `<tr><td colspan="4" class="text-muted">Sin datos</td></tr>`;
 
-        drawBarOperador(porOpArr);
+        // Charts: destruir ANTES de crear (evita "Canvas is already in use")
+        destroyIfExists(chOp);
+        destroyIfExists(chDia);
+        destroyIfExists(chPay);
+        destroyIfExists(chSaldo);
+        destroyIfExists(chEgMes);
 
-        // ========= Serie diaria (tickets, extra, egresos, neto) =========
-        const keyDay = (d)=> {
-          const dt = new Date(d);
-          dt.setHours(0,0,0,0);
-          return dt.toISOString().slice(0,10); // YYYY-MM-DD
-        };
+        // Bar Operador
+        {
+          const labels = (porOpArr||[]).map(r=>r.nombre);
+          const data = (porOpArr||[]).map(r=> N(r.monto + (r.extra||0)));
+          const ctx = document.getElementById('chartOperador');
+          chOp = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: [{ label: 'Total por operador (Bs)', data }] },
+            options: { responsive:true, plugins:{ legend:{ display:false }}, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}} }
+          });
+        }
+
+        // Serie diaria
+        const keyDay = (d)=> { const dt = new Date(d); dt.setHours(0,0,0,0); return dt.toISOString().slice(0,10); };
         const series = {};
-        tickets.forEach(t=>{
+        (allPaid||[]).forEach(t=>{
           const k = keyDay(t.hora_salida);
           (series[k] ||= {t:0,x:0,e:0,n:0});
           series[k].t += N(t.costo_total);
         });
-        extras.forEach(r=>{
+        (extrasArr||[]).forEach(r=>{
           const k = keyDay(r.creado_at);
           (series[k] ||= {t:0,x:0,e:0,n:0});
           series[k].x += N(r.monto);
         });
-        egresos.forEach(g=>{
+        (egresosArr||[]).forEach(g=>{
           const k = keyDay(g.creado_at);
           (series[k] ||= {t:0,x:0,e:0,n:0});
           series[k].e += N(g.monto);
@@ -303,29 +424,88 @@
         const dE = labels.map(k=>series[k].e);
         const dN = labels.map((k,i)=> dT[i] + dX[i] - dE[i]);
 
-        drawLineDiario(labels, dT, dX, dE, dN);
+        {
+          const ctx = document.getElementById('chartDiario');
+          chDia = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets: [
+              { label:'Tickets', data:dT },
+              { label:'Extras',  data:dX },
+              { label:'Egresos', data:dE },
+              { label:'Neto',    data:dN }
+            ]},
+            options: { responsive:true, plugins:{ legend:{ position:'bottom' }}, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}} }
+          });
+        }
 
-        // ========= Pie método de pago =========
-        const payCount = tickets.reduce((m,t)=>{
+        // Pie método de pago
+        const payCount = (allPaid||[]).reduce((m,t)=>{
           const k = (t.tipo_pago||'efectivo').toLowerCase();
           m[k] = (m[k]||0) + 1;
           return m;
         }, {});
-        drawPiePago(['efectivo','qr'], [payCount['efectivo']||0, payCount['qr']||0]);
+        {
+          const ctx = document.getElementById('chartPago');
+          chPay = new Chart(ctx, {
+            type: 'pie',
+            data: { labels:['efectivo','qr','plan'], datasets: [{ data:[payCount['efectivo']||0, payCount['qr']||0, payCount['plan']||0] }] },
+            options: { responsive:true, plugins:{ legend:{ position:'bottom' }} }
+          });
+        }
 
-        // ========= Egresos tabla (con eliminar) =========
+        // Extracto bancario
+        const saldoInicial = Number(document.getElementById('saldoInicial').value||0);
+        let tx = [];
+        if(ParkingAPI.extractoBancario){
+          tx = await ParkingAPI.extractoBancario({ startISO, endISO });
+        }else{
+          // fallback si auth.js viejo
+          (allPaid||[]).forEach(r=> tx.push({ ts:r.hora_salida, tipo:'+tickets', concepto:'Pago ticket', monto:+(r.costo_total||0) }));
+          (extrasArr||[]).forEach(r=> tx.push({ ts:r.creado_at,  tipo:'+extra',   concepto:'Ingreso extra', monto:+(r.monto||0) }));
+          (egresosArr||[]).forEach(r=> tx.push({ ts:r.creado_at,  tipo:'-egreso',  concepto:r.concepto||'Egreso', monto:-Math.abs(+r.monto||0) }));
+          tx.sort((a,b)=> new Date(a.ts) - new Date(b.ts));
+        }
+
+        let saldo = saldoInicial;
+        const tbEx = document.getElementById('tbodyExtracto');
+        tbEx.innerHTML = tx.map(r=>{
+          saldo += Number(r.monto||0);
+          return `
+            <tr>
+              <td>${new Date(r.ts).toLocaleString()}</td>
+              <td>${r.tipo}</td>
+              <td>${r.concepto||'-'}</td>
+              <td class="text-end mono">${Number(r.monto).toFixed(2)}</td>
+              <td class="text-end mono">${saldo.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('') || `<tr><td colspan="5" class="text-muted">Sin movimientos</td></tr>`;
+
+        {
+          // Línea de saldo
+          let s = saldoInicial;
+          const lblSaldo = ['Inicio'].concat(tx.map(r=> new Date(r.ts).toLocaleString()));
+          const datSaldo = [saldoInicial].concat(tx.map(r=> (s += Number(r.monto||0))));
+          const ctx = document.getElementById('chartSaldo');
+          chSaldo = new Chart(ctx, {
+            type: 'line',
+            data: { labels: lblSaldo, datasets: [{ label:'Saldo', data: datSaldo }] },
+            options: { responsive:true, plugins:{ legend:{ position:'bottom' }}, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}} }
+          });
+        }
+
+        // Egresos tabla (con eliminar)
         const tbe = document.getElementById('tbodyEgresos');
-        tbe.innerHTML = egresos
-          .sort((a,b)=> new Date(b.creado_at) - new Date(a.creado_at))
+        tbe.innerHTML = (egresosArr||[])
+          .slice().sort((a,b)=> new Date(b.creado_at) - new Date(a.creado_at))
           .map(g=>`
             <tr>
               <td>${new Date(g.creado_at).toLocaleString()}</td>
-              <td>${g.concepto}</td>
+              <td>${g.concepto||'-'}</td>
               <td class="text-end mono">${N(g.monto).toFixed(2)}</td>
               <td class="text-end"><button class="btn btn-sm btn-danger" data-del="${g.id}">Eliminar</button></td>
             </tr>
-          `).join('') || `<tr><td colspan="4" class="text-muted">Sin egresos</td></tr>`;
-
+          `).join('') || `<tr><td colspan="4" class="text-muted">Sin egresos en el período</td></tr>`;
         tbe.querySelectorAll('button[data-del]').forEach(btn=>{
           btn.addEventListener('click', async ()=>{
             const id = btn.getAttribute('data-del');
@@ -337,12 +517,40 @@
           });
         });
 
-        // ========= Pagos recientes =========
+        // Egresos por mes (RPC o fallback)
+        let byMonth = [];
+        try{
+          const rpc = await supa.rpc('egresos_por_mes');
+          if(rpc.data) byMonth = rpc.data;
+        }catch(_){}
+        if(!byMonth.length){
+          const allEg = await supa.from('egresos_admin').select('monto,creado_at');
+          const agg = {};
+          (allEg.data||[]).forEach(r=>{
+            const d = new Date(r.creado_at);
+            const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            agg[key] = (agg[key]||0) + N(r.monto);
+          });
+          byMonth = Object.entries(agg).map(([mes,total])=>({mes,total}))
+            .sort((a,b)=> a.mes<b.mes?-1:1).slice(-12);
+        }
+        document.getElementById('tbodyEgresosMes').innerHTML =
+          (byMonth||[]).map(r=>`
+            <tr><td>${r.mes}</td><td class="text-end mono">${N(r.total).toFixed(2)}</td></tr>
+          `).join('') || `<tr><td colspan="2" class="text-muted">Sin datos</td></tr>`;
+
+        {
+          const ctx = document.getElementById('chartEgresosMes');
+          chEgMes = new Chart(ctx, {
+            type: 'bar',
+            data: { labels:(byMonth||[]).map(r=>r.mes), datasets:[{ label:'Egresos por mes', data:(byMonth||[]).map(r=>N(r.total)) }] },
+            options: { responsive:true, plugins:{ legend:{ display:false }}, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}} }
+          });
+        }
+
+        // Pagos recientes (20)
         const tbR = document.getElementById('tbodyRecientes');
-        const recientes = tickets
-          .slice()
-          .sort((a,b)=> new Date(b.hora_salida) - new Date(a.hora_salida))
-          .slice(0,20);
+        const recientes = (allPaid||[]).slice().sort((a,b)=> new Date(b.hora_salida)-new Date(a.hora_salida)).slice(0,20);
         tbR.innerHTML = recientes.map(t=>`
           <tr>
             <td class="mono">${t.placa_vehiculo}</td>
@@ -354,61 +562,6 @@
           </tr>
         `).join('') || `<tr><td colspan="6" class="text-muted">Sin pagos en el período</td></tr>`;
       }
-
-      // Agregar egreso
-      document.getElementById('btnEgreso').addEventListener('click', async ()=>{
-        const concepto = document.getElementById('egConcepto').value.trim();
-        const monto = Number(document.getElementById('egMonto').value);
-        if(!concepto || !(monto>=0)){ toast('Completa concepto y monto válido', false); return; }
-        const { data:{ user } } = await supa.auth.getUser();
-        const admin_id = user?.id;
-        const { error } = await supa.from('egresos_admin').insert([{ concepto, monto, admin_id }]);
-        if(error){ toast(error.message||'No se pudo guardar', false); return; }
-        document.getElementById('egConcepto').value='';
-        document.getElementById('egMonto').value='';
-        toast('Egreso agregado');
-        document.getElementById('btnRefrescar').click();
-      });
-
-      // ======= Charts helpers =======
-      function drawBarOperador(rows){
-        const labels = rows.map(r=>r.nombre);
-        const data = rows.map(r=> (r.monto + (r.extra||0)));
-        if(chOp) chOp.destroy();
-        const ctx = document.getElementById('chartOperador');
-        chOp = new Chart(ctx, {
-          type: 'bar',
-          data: { labels, datasets: [{ label:'Total por operador (Bs)', data }] },
-          options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}}}
-        });
-      }
-      function drawLineDiario(labels, t, x, e, n){
-        if(chDia) chDia.destroy();
-        const ctx = document.getElementById('chartDiario');
-        chDia = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              { label:'Tickets', data:t },
-              { label:'Extras',  data:x },
-              { label:'Egresos', data:e },
-              { label:'Neto',    data:n }
-            ]
-          },
-          options: { responsive:true, plugins:{ legend:{ position:'bottom' }}, scales:{ x:{ ticks:{ color:'#9fb0c5' }}, y:{ ticks:{ color:'#9fb0c5' }}}}
-        });
-      }
-      function drawPiePago(labels, data){
-        if(chPay) chPay.destroy();
-        const ctx = document.getElementById('chartPago');
-        chPay = new Chart(ctx, {
-          type: 'pie',
-          data: { labels, datasets: [{ data }] },
-          options: { responsive:true, plugins:{ legend:{ position:'bottom' }} }
-        });
-      }
-
     })();
   </script>
 </body>

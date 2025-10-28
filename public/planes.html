@@ -1,66 +1,102 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Planes · ParqueoApp</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Parqueo · Tickets</title>
+  <link rel="stylesheet" href="style.css"/>
   <div id="toast" class="toast"></div>
   <style>
-    .card{background:#0b1220;border:1px solid #1f2937;border-radius:14px;padding:16px}
-    .table-wrap{overflow:auto}
+    body{background:#0b1220}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:16px;padding:18px}
+    .k{color:#9fb0c5;font-size:12px}
+    .mono{font-variant-numeric:tabular-nums}
+    .big{font-size:28px;font-weight:800}
   </style>
 </head>
 <body>
   <nav class="topbar">
-    <strong>📅 Planes</strong>
-    <span id="currentUser"></span>
+    <strong>🚘 Tickets</strong>
     <div class="spacer"></div>
-    <button id="menuToggle" class="menu-toggle">☰</button>
-    <div id="navLinks" class="links">
-      <a href="dashboard.html">🏠 Dashboard</a>
-      <a href="ingresos.html">🚘 Tickets</a>
-      <a href="tarifas.html">💲 Tarifas</a>
-      <a href="admin.html">🛡️ Admin</a>
-      <button onclick="AuthUI.logout()">Salir</button>
-    </div>
+    <a href="dashboard.html">Panel</a>
+    <a href="planes.html">Planes</a>
+    <a href="tarifas.html">Tarifas</a>
+    <button onclick="AuthUI.logout()">Salir</button>
   </nav>
 
   <main class="container">
-
+    <!-- Abrir ticket -->
     <section class="card">
-      <h2>➕ Asignar plan a placa</h2>
-      <div class="row g-3">
-        <div class="col-12 col-lg-3">
+      <h3>➕ Abrir ticket</h3>
+      <form id="formAbrir" class="row g-3">
+        <div class="col-12 col-md-4">
           <label class="form-label">Placa</label>
-          <input id="plPlaca" class="form-control" placeholder="ABC 123" />
+          <input id="inPlaca" class="form-control" placeholder="ABC123" required />
         </div>
-        <div class="col-12 col-lg-4">
-          <label class="form-label">Plan</label>
-          <select id="plPlan" class="form-select"></select>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Tipo vehículo</label>
+          <select id="inTipo" class="form-select">
+            <option value="auto">Auto</option>
+            <option value="moto">Moto</option>
+            <option value="bicicleta">Bicicleta</option>
+          </select>
         </div>
-        <div class="col-12 col-lg-3">
-          <label class="form-label">Fecha inicio</label>
-          <input id="plInicio" type="datetime-local" class="form-control" />
+        <div class="col-12 col-md-4">
+          <label class="form-label">Categoría</label>
+          <select id="inCat" class="form-select">
+            <option value="normal">Normal</option>
+            <option value="frecuente">Frecuente</option>
+          </select>
         </div>
-        <div class="col-12 col-lg-2 d-grid">
-          <label class="form-label">&nbsp;</label>
-          <button id="btnPlan" class="btn btn-primary">Asignar</button>
+        <div class="col-12 d-grid">
+          <button class="btn btn-primary">Abrir</button>
         </div>
-      </div>
-      <p class="hint mt-2">Se desactiva el plan activo anterior de la placa y se crea uno nuevo en <code>vehiculos_planes</code>.</p>
+      </form>
     </section>
 
+    <!-- Cerrar ticket -->
     <section class="card mt-3">
-      <h3>📋 Asignaciones recientes</h3>
+      <h3>✅ Cerrar ticket</h3>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Placa abierta</label>
+          <select id="cbPlacas" class="form-select"></select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">Método de pago</label>
+          <select id="inPago" class="form-select">
+            <option value="efectivo" selected>Efectivo</option>
+            <option value="qr">QR</option>
+            <option value="plan">Plan</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4 d-grid align-end">
+          <label class="form-label">&nbsp;</label>
+          <button id="btnPreview" class="btn btn-secondary">Previsualizar total</button>
+        </div>
+
+        <div class="col-12">
+          <div class="k">Total estimado</div>
+          <div id="previewTotal" class="big mono">—</div>
+          <div id="previewDetalle" class="k" style="margin-top:4px"></div>
+        </div>
+
+        <div class="col-12 d-grid">
+          <button id="btnCerrar" class="btn btn-success">Cerrar ticket</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Abiertos -->
+    <section class="card mt-3">
+      <h3>🟡 Tickets abiertos</h3>
       <div class="table-wrap">
         <table class="table table-dark table-borderless align-middle">
-          <thead><tr><th>Placa</th><th>Plan</th><th>Tipo</th><th>Precio</th><th>Duración (días)</th><th>Inicio</th><th>Activo</th></tr></thead>
-          <tbody id="tbodyPlanes"></tbody>
+          <thead><tr><th>Placa</th><th>Tipo</th><th>Entrada</th><th>Categoría</th><th>Acción</th></tr></thead>
+          <tbody id="tbodyAbiertos"></tbody>
         </table>
       </div>
     </section>
-
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -68,52 +104,88 @@
   <script src="auth.js"></script>
   <script>
     (async ()=>{
-      await AuthUI.requireAdmin();
+      await AuthUI.requireLogin();
 
-      document.getElementById('menuToggle').addEventListener('click', ()=>{
-        document.getElementById('navLinks').classList.toggle('open');
-      });
+      // Pide permiso de notificaciones (una vez)
+      try{ if(Notification && Notification.permission!=='granted'){ Notification.requestPermission(); } }catch(_){}
 
-      const selPlan = document.getElementById('plPlan');
+      const cbPlacas = document.getElementById('cbPlacas');
+      const pvTotal  = document.getElementById('previewTotal');
+      const pvDet    = document.getElementById('previewDetalle');
 
-      async function cargarCatalogo(){
-        const planes = await ParkingAPI.catalogoPlanes();
-        selPlan.innerHTML = (planes||[]).map(p =>
-          `<option value="${p.id}">${p.nombre} — Bs ${Number(p.precio||0).toFixed(2)} (${p.tipo})</option>`
-        ).join('') || `<option disabled>No hay planes</option>`;
+      // Cargar placas y tabla
+      async function loadAbiertos(){
+        const placas = await ParkingAPI.placasAbiertas();
+        cbPlacas.innerHTML = placas.map(p=>`<option value="${p}">${p}</option>`).join('') || `<option value="">(sin abiertos)</option>`;
+        // tabla
+        const rows = await ParkingAPI.listarAbiertos();
+        document.getElementById('tbodyAbiertos').innerHTML =
+          rows.map(r=>`
+            <tr>
+              <td class="mono">${r.placa_vehiculo}</td>
+              <td>${r.tipo_vehiculo}</td>
+              <td>${new Date(r.hora_entrada).toLocaleString()}</td>
+              <td>${r.categoria||'-'}</td>
+              <td><button class="btn btn-sm btn-danger" data-id="${r.id}">Cerrar manual</button></td>
+            </tr>`).join('') || `<tr><td colspan="5" class="text-muted">No hay tickets abiertos</td></tr>`;
+
+        document.querySelectorAll('button[data-id]').forEach(btn=>{
+          btn.addEventListener('click', async ()=>{
+            if(!confirm('¿Cerrar manualmente este ticket (0 Bs)?')) return;
+            await ParkingAPI.cerrarTicketManual(btn.getAttribute('data-id'));
+            await loadAbiertos();
+          });
+        });
       }
 
-      async function cargarAsignaciones(){
-        const list = await ParkingAPI.listarAsignaciones();
-        const tb = document.getElementById('tbodyPlanes');
-        tb.innerHTML = (list||[]).map(r=>`
-          <tr>
-            <td class="mono">${r.placa}</td>
-            <td>${r.plan}</td>
-            <td>${r.tipo}</td>
-            <td class="mono">${(r.precio??0).toFixed(2)}</td>
-            <td class="mono">${r.duracion_dias ?? '-'}</td>
-            <td>${r.fecha_inicio ? new Date(r.fecha_inicio).toLocaleString() : '-'}</td>
-            <td>${r.activo ? '✅' : '—'}</td>
-          </tr>
-        `).join('') || `<tr><td colspan="7" class="text-muted">Sin asignaciones</td></tr>`;
-      }
-
-      document.getElementById('btnPlan').addEventListener('click', async ()=>{
-        const placa = document.getElementById('plPlaca').value.trim();
-        const plan_id = selPlan.value;
-        const fi = document.getElementById('plInicio').value;
-        if(!placa || !plan_id){ toast('Placa y plan son obligatorios', false); return; }
+      // Abrir
+      document.getElementById('formAbrir').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const placa = document.getElementById('inPlaca').value;
+        const tipo  = document.getElementById('inTipo').value;
+        const cat   = document.getElementById('inCat').value;
         try{
-          await ParkingAPI.asignarPlanAPlaca({ placa, plan_id, fecha_inicio: fi ? new Date(fi).toISOString() : null });
-          document.getElementById('plPlaca').value='';
-          document.getElementById('plInicio').value='';
-          await cargarAsignaciones();
-        }catch(e){ toast(e.message||String(e), false); }
+          await ParkingAPI.crearTicket({ placa, tipoVehiculo: tipo, categoria: cat });
+          await loadAbiertos();
+          e.target.reset();
+        }catch(err){ toast(err.message||'No se pudo abrir el ticket', false); }
       });
 
-      await cargarCatalogo();
-      await cargarAsignaciones();
+      // Preview
+      async function doPreview(){
+        const placa = cbPlacas.value;
+        if(!placa){ pvTotal.textContent='—'; pvDet.textContent=''; return; }
+        try{
+          const res = await ParkingAPI.previewCierre({ placa });
+          pvTotal.textContent = (Number(res.total||0)).toFixed(2) + ' Bs';
+          pvDet.textContent   = res.detalle || '';
+          if(res.usaPlan){ document.getElementById('inPago').value = 'plan'; }
+        }catch(err){
+          pvTotal.textContent='—'; pvDet.textContent = err.message||'No se pudo previsualizar';
+        }
+      }
+      cbPlacas.addEventListener('change', doPreview);
+      document.getElementById('btnPreview').addEventListener('click', async (e)=>{ e.preventDefault(); await doPreview(); });
+
+      // Cerrar
+      document.getElementById('btnCerrar').addEventListener('click', async ()=>{
+        const placa = cbPlacas.value;
+        const pago  = document.getElementById('inPago').value;
+        if(!placa){ toast('Selecciona una placa', false); return; }
+        try{
+          const prev = await ParkingAPI.previewCierre({ placa });
+          const total = Number(prev.total||0);
+          if(!confirm(`Se cerrará la placa ${placa} por ${total.toFixed(2)} Bs.\n\n${prev.detalle}\n\n¿Confirmar?`)) return;
+
+          const cobrado = await ParkingAPI.cerrarTicket({ placa, tipo_pago: pago });
+          toast(`Cerrado · ${Number(cobrado||0).toFixed(2)} Bs`);
+          pvTotal.textContent='—'; pvDet.textContent='';
+          await loadAbiertos();
+        }catch(err){ toast(err.message||'No se pudo cerrar', false); }
+      });
+
+      await loadAbiertos();
+      await doPreview();
     })();
   </script>
 </body>

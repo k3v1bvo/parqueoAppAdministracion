@@ -3,28 +3,41 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Parqueo - Registro</title>
+  <title>Parqueo · Registro</title>
   <link rel="stylesheet" href="style.css" />
   <div id="toast" class="toast"></div>
+  <style>
+    body{background:#0b1220}
+    .card{background:#0f172a;border:1px solid #1f2937;border-radius:16px;padding:22px}
+    .brand{display:flex;gap:10px;align-items:center;justify-content:center;color:#cbd5e1;margin-bottom:16px}
+    .brand span{font-weight:800}
+    .muted{color:#9fb0c5}
+    .links a{color:#93c5fd}
+  </style>
 </head>
-<body class="bg-dark">
+<body>
   <main class="container" style="max-width:520px">
+    <div class="brand">🚗 <span>ParqueoApp</span></div>
     <div class="card">
       <h2>👤 Crear cuenta</h2>
       <form id="regForm" class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Nombre (opcional)</label>
+          <input name="nombre" class="form-control" placeholder="Juan Pérez" />
+        </div>
         <div class="col-12">
           <label class="form-label">Email</label>
           <input name="email" type="email" class="form-control" placeholder="ejemplo@correo.com" required />
         </div>
         <div class="col-12">
           <label class="form-label">Contraseña</label>
-          <input name="password" type="password" class="form-control" placeholder="••••••••" required />
+          <input name="password" type="password" class="form-control" placeholder="Mínimo 6 caracteres" required minlength="6" />
         </div>
         <div class="col-12 d-grid">
           <button type="submit" class="btn btn-primary">Registrarme</button>
         </div>
       </form>
-      <p class="text-muted mt-2">¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a></p>
+      <p class="muted mt-2">¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a></p>
     </div>
   </main>
 
@@ -33,7 +46,8 @@
   <script src="auth.js"></script>
   <script>
     document.querySelector('#regForm').addEventListener('submit', async (e)=>{
-      e.preventDefault(); await AuthUI.handleRegister(e.target);
+      e.preventDefault();
+      await AuthUI.handleRegister(e.target);
     });
   </script>
 </body>
