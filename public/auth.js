@@ -2,7 +2,7 @@
 // ================================================
 // 🔐 ParqueoApp · Frontend
 // Tablas: usuarios, tickets, ingresos_extra, egresos_admin,
-//         planes, vehiculos, vehiculos_planes, configuracion
+//         planes, vehiculos, vehiculos_planes, configuracion, tarifas
 // ================================================
 
 const supa = window.supabase.createClient(
@@ -51,11 +51,9 @@ const AuthUI = {
     const password = form.password.value;
     if(!email || !password){ toast('Email y contraseña requeridos', false); return; }
 
-    // 1) Alta en Auth
     const { error } = await supa.auth.signUp({ email, password });
     if(error){ toast(error.message || 'No se pudo registrar', false); return; }
 
-    // 2) Fila espejo en public.usuarios (rol=empleado)
     try{
       const { data: userData } = await supa.auth.getUser();
       const uid = userData?.user?.id;
@@ -112,8 +110,8 @@ function setCurrentUser(session){
 }
 
 // ---------- Utils ----------
-const fmtDate = (d)=> new Date(d).toLocaleString();
-const cleanPlaca = (p)=> (p||'').toUpperCase().replace(/\s+/g,'');
+const fmtDate   = (d)=> new Date(d).toLocaleString();
+const cleanPlaca= (p)=> (p||'').toUpperCase().replace(/\s+/g,'');
 
 // ---------- API ----------
 const ParkingAPI = {
@@ -156,6 +154,22 @@ const ParkingAPI = {
     return true;
   },
 
+  // ===== TARIFAS (cache en memoria para cálculos) =====
+  _tarifasCache: null,
+  _tarifasAt: 0,
+  async getTarifasMap() {
+    if (!this._tarifasCache || (Date.now() - this._tarifasAt) > 30000) {
+      const { data, error } = await supa.from('tarifas')
+        .select('tipo_vehiculo,precio_primera_hora,precio_hora_extra,precio_minimo,umbral_minutos');
+      if (error) throw error;
+      this._tarifasCache = Object.fromEntries(
+        (data || []).map(r => [ (r.tipo_vehiculo||'auto').toLowerCase(), r ])
+      );
+      this._tarifasAt = Date.now();
+    }
+    return this._tarifasCache;
+  },
+
   // ===== TICKETS =====
   async crearTicket({ placa, tipoVehiculo, categoria = 'normal' }) {
     const { data: { user} } = await supa.auth.getUser();
@@ -181,19 +195,25 @@ const ParkingAPI = {
     return true;
   },
 
-  _calcularCostoPorReglas(ticket, cierreDate) {
+  async _calcularCostoPorReglas(ticket, cierreDate) {
     const entrada = new Date(ticket.hora_entrada);
-    const horaEntrada = entrada.getHours();
-    const categoria = (ticket.categoria || 'normal').toLowerCase();
-    // Noche 20:00–07:59 → 12 Bs
-    if (horaEntrada >= 20 || horaEntrada < 8) return 12;
-    // Día 08:00–19:59
-    if (categoria === 'frecuente') return 12;
-    if (categoria === 'normal')    return 15;
-    // Fallback por horas (7 + 1)
-    const ms = (cierreDate - entrada);
-    const horas = Math.max(1, Math.ceil(ms / (1000 * 60 * 60)));
-    return 7 + (horas - 1) * 1;
+    const salida  = cierreDate || new Date();
+
+    const tf = await this.getTarifasMap();
+    const tipo = (ticket.tipo_vehiculo || 'auto').toLowerCase();
+    const r = tf[tipo] || tf['auto'] || {
+      precio_primera_hora: 7, precio_hora_extra: 1, precio_minimo: 5, umbral_minutos: 45
+    };
+
+    const diffMin = Math.max(0, (salida - entrada) / 1000 / 60);
+
+    if (diffMin <= Number(r.umbral_minutos || 45)) {
+      return Number(r.precio_minimo || 5);
+    }
+
+    const extraHoras = Math.ceil((diffMin - 60) / 60);
+    const total = Number(r.precio_primera_hora || 0) + (extraHoras > 0 ? extraHoras * Number(r.precio_hora_extra || 0) : 0);
+    return total;
   },
 
   async _vehiculoIdPorPlaca(placa){
@@ -245,18 +265,10 @@ const ParkingAPI = {
     const plan = await this._planActivoParaPlaca(placa, now);
 
     if (plan) {
-      return {
-        usaPlan: true,
-        total: 0,
-        detalle: `Ticket con plan activo: ${plan.nombre} (${plan.tipo}). El cierre no cobra adicional.`
-      };
+      return { usaPlan: true, total: 0, detalle: `Ticket con plan activo: ${plan.nombre} (${plan.tipo}). El cierre no cobra adicional.` };
     } else {
-      const total = this._calcularCostoPorReglas(t, now);
-      return {
-        usaPlan: false,
-        total,
-        detalle: `Cálculo por reglas (día/noche/frecuente) desde ${fmtDate(t.hora_entrada)}.`
-      };
+      const total = await this._calcularCostoPorReglas(t, now);
+      return { usaPlan: false, total, detalle: `Cálculo por reglas desde ${fmtDate(t.hora_entrada)}.` };
     }
   },
 
@@ -282,7 +294,7 @@ const ParkingAPI = {
     let total = 0;
     const plan = await this._planActivoParaPlaca(placa, now);
     if(!plan){
-      total = this._calcularCostoPorReglas(t, now);
+      total = await this._calcularCostoPorReglas(t, now);
     }else{
       tipo_pago = 'plan';
     }
@@ -568,20 +580,23 @@ const ParkingAPI = {
     return true;
   },
 
-  // ===== TARIFAS =====
+  // ===== TARIFAS (CRUD UI) =====
   async listarTarifas() {
     const { data, error } = await supa.from('tarifas')
-      .select('id,tipo_vehiculo,precio_primera_hora,precio_hora_extra')
+      .select('id,tipo_vehiculo,precio_primera_hora,precio_hora_extra,precio_minimo,umbral_minutos')
       .order('tipo_vehiculo');
     if (error) throw error;
     return data || [];
   },
-  async actualizarTarifa(id, primera, extra) {
+  async actualizarTarifa(id, primera, extra, minimo, umbral) {
     const { error } = await supa.from('tarifas').update({
       precio_primera_hora: Number(primera),
-      precio_hora_extra: Number(extra)
+      precio_hora_extra:   Number(extra),
+      precio_minimo:       Number(minimo),
+      umbral_minutos:      Number(umbral)
     }).eq('id', id);
     if (error) throw error;
+    this._tarifasCache = null; // invalida cache
     return true;
   }
 };
